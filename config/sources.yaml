@@ -1,0 +1,116 @@
+# Funding Radar sources. Every source reports its own health; a source that falls to
+# near-zero is flagged rather than silently reducing coverage.
+
+filters:
+  # A round qualifies at 2M or more in any of these currencies, as reported.
+  # Other currencies are converted roughly, only to apply the cut-off.
+  min_amount: 2000000
+  min_amount_currencies: [USD, GBP, EUR]
+  stages: [pre-seed, seed, seed extension, series a, series b]
+  regions: [uk, europe]
+  # Rounds stay on the site for this long.
+  window_days: 120
+  # Cheap keyword gate before any model call.
+  keywords:
+    - raises
+    - raised
+    - funding
+    - fundraise
+    - seed round
+    - pre-seed
+    - series a
+    - series b
+    - venture round
+    - investment round
+    - secures
+    - closes
+    - led by
+    - backed by
+    - million
+    - "$"
+    - "€"
+    - "£"
+
+# Claude assigns each company exactly one of these, so filters stay stable.
+# Anything it cannot place goes to "other" for periodic review.
+sectors:
+  - AI infrastructure and tooling
+  - AI applications
+  - Developer tools
+  - Data and analytics
+  - Cybersecurity
+  - Fintech and payments
+  - Insurtech
+  - Regtech, legal and compliance
+  - Enterprise SaaS and operations
+  - HR and workforce
+  - Healthtech
+  - Biotech software
+  - Climate and energy
+  - Commerce and retail
+  - Logistics and supply chain
+  - Real estate and construction
+  - Media and creative tools
+  - Gaming
+  - Education
+  - Robotics and hardware
+  - Space and geospatial
+  - Consumer apps
+  - Other
+
+rss:
+  - {name: TechCrunch Fundraising, url: "https://techcrunch.com/category/fundraising/feed/"}
+  - {name: TechCrunch Venture, url: "https://techcrunch.com/category/venture/feed/"}
+  - {name: Sifted, url: "https://sifted.eu/feed"}
+  - {name: Tech.eu, url: "https://tech.eu/feed/"}
+  - {name: EU-Startups, url: "https://www.eu-startups.com/feed/"}
+  - {name: Crunchbase News, url: "https://news.crunchbase.com/sections/venture/feed/"}
+  - {name: UKTN, url: "https://www.uktech.news/feed"}
+  - {name: Tech Funding News, url: "https://techfundingnews.com/feed/"}
+  - {name: Silicon Canals, url: "https://siliconcanals.com/feed/"}
+  - {name: Maddyness UK, url: "https://www.maddyness.com/uk/feed/"}
+
+# Google News searches. Widest reach of any source; polled gently.
+google_news:
+  locale: {hl: "en-GB", gl: "GB", ceid: "GB:en"}
+  window: "when:2d"
+  queries:
+    - '"raises" ("seed" OR "series a" OR "series b") startup London'
+    - '"raises" ("seed" OR "series a" OR "series b") startup UK'
+    - '"secures" ("seed" OR "series a") funding London startup'
+    - '"raises" ("seed" OR "series a" OR "series b") startup Europe'
+    - '"raises" AI startup London funding'
+    - '"raises" AI startup Europe funding'
+    - '"led by" ("seed round" OR "Series A") London'
+    - '"led by" ("seed round" OR "Series A") Berlin OR Paris OR Amsterdam OR Stockholm'
+    - '"Series B" raises startup UK'
+    - 'fintech OR healthtech OR "developer tools" raises "Series A" Europe'
+
+# GDELT adds non-English European coverage.
+gdelt:
+  enabled: true
+  timespan: "2d"
+  queries:
+    - '("raises" OR "funding round" OR "secures funding") (seed OR "series a" OR "series b")'
+
+# Fund announcement pages: often the first public word, and they name the investor.
+vc_pages:
+  - {name: Index Ventures, url: "https://www.indexventures.com/perspectives/"}
+  - {name: Balderton, url: "https://www.balderton.com/news/"}
+  - {name: LocalGlobe, url: "https://localglobe.vc/news/"}
+  - {name: Seedcamp, url: "https://seedcamp.com/resources/"}
+  - {name: Accel, url: "https://www.accel.com/noteworthy"}
+  - {name: Notion Capital, url: "https://notion.vc/news/"}
+  - {name: Dawn Capital, url: "https://dawncapital.com/news/"}
+  - {name: Air Street Capital, url: "https://www.airstreet.com/blog"}
+  - {name: Atomico, url: "https://atomico.com/insights/"}
+  - {name: Creandum, url: "https://creandum.com/stories/"}
+  - {name: Northzone, url: "https://northzone.com/news/"}
+  - {name: EQT Ventures, url: "https://eqtgroup.com/news"}
+  - {name: Point Nine, url: "https://www.pointnine.com/blog"}
+  - {name: Cherry Ventures, url: "https://www.cherry.vc/news"}
+  - {name: Speedinvest, url: "https://www.speedinvest.com/blog"}
+
+# UK Companies House: verification and unannounced raises (needs COMPANIES_HOUSE_KEY).
+companies_house:
+  enabled: false
