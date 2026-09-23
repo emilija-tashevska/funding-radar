@@ -64,43 +64,41 @@ class Article:
 
 @dataclass
 class Round:
-    """A funding round extracted from one article."""
+    """A funding round as extracted from an article, before it is stored."""
 
     company: str
     summary: str = ""
-    stage: str = ""
+    stage: str = ""            # normalised: pre-seed | seed | series a | ...
+    stage_raw: str = ""        # what the article actually said
     amount_text: str = ""
-    amount_value: Optional[float] = None
+    amount_value: float | None = None   # as reported, in `currency`
     currency: str = ""
-    round_date: Optional[str] = None
-    investors: str = ""
+    amount_usd: float | None = None     # rough, only for the size cut-off
+    round_date: str | None = None
+    investors: list[str] = field(default_factory=list)
+    lead_investor: str = ""
     hq_city: str = ""
     hq_country: str = ""
-    region: str = ""  # uk | europe | us | other
+    region: str = ""           # uk | europe | us | other
     sector: str = ""
     ai_native: bool = False
     company_domain: str = ""
-    evidence: str = ""  # the sentence the amount came from
+    evidence: str = ""         # the sentence the amount came from
     confidence: float = 0.0
-    # Filled in later stages
-    fit_score: Optional[float] = None
-    fit_reason: str = ""
-    angle: str = ""  # product leadership | pricing | growth
     confirmed: bool = False
     amount_disputed: bool = False
-    sources: list[dict] = field(default_factory=list)
+    qualified: bool = False
 
     @property
     def company_key(self) -> str:
         return normalize_company(self.company)
 
-    @property
-    def round_id(self) -> str:
-        """Identity of the round itself, not the article.
+    def round_id_for(self, company_id: str) -> str:
+        """Identity of a round: the company plus when it was announced.
 
-        Domain when we have one, else the normalised name; the month keeps repeat
-        raises apart. Cross-month duplicates are caught by the resolver's date window.
+        Stage is deliberately not part of the key. Outlets disagree about whether a
+        raise is a seed or a Series A, and a round that changed label is still the
+        same round; the date window in the store is what keeps them together.
         """
-        key = self.company_domain or normalize_company(self.company)
         month = (self.round_date or "")[:7]
-        return sha256(f"{key}|{self.stage.lower()}|{month}".encode()).hexdigest()[:32]
+        return sha256(f"{company_id}|{month}".encode()).hexdigest()[:32]

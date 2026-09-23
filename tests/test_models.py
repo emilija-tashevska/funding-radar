@@ -36,19 +36,20 @@ def test_domains_normalise(raw, expected):
     assert normalize_domain(raw) == expected
 
 
-def test_same_round_reported_twice_shares_an_id():
-    first = Round(company="Acme AI Ltd", stage="Series A", round_date="2026-09-20", company_domain="acme.ai")
-    second = Round(company="Acme AI", stage="series a", round_date="2026-09-28", company_domain="acme.ai")
-    assert first.round_id == second.round_id
+def test_a_round_id_is_stable_for_one_company_and_month():
+    first = Round(company="Acme AI Ltd", stage="Series A", round_date="2026-09-20")
+    second = Round(company="Acme AI", stage="series a", round_date="2026-09-28")
+    assert first.round_id_for("d:acme.ai") == second.round_id_for("d:acme.ai")
 
 
-def test_a_later_round_at_a_new_stage_is_a_separate_row():
-    seed = Round(company="Acme AI", stage="Seed", round_date="2026-01-10", company_domain="acme.ai")
-    series_a = Round(company="Acme AI", stage="Series A", round_date="2026-09-10", company_domain="acme.ai")
-    assert seed.round_id != series_a.round_id
+def test_a_relabelled_round_keeps_its_identity():
+    """Outlets disagree on seed vs Series A; the round is still the same round."""
+    seed = Round(company="Acme AI", stage="Seed", round_date="2026-09-20")
+    series_a = Round(company="Acme AI", stage="Series A", round_date="2026-09-20")
+    assert seed.round_id_for("d:acme.ai") == series_a.round_id_for("d:acme.ai")
 
 
-def test_companies_without_a_domain_still_match_by_name():
-    first = Round(company="Metris Energy", stage="Seed", round_date="2026-09-02")
-    second = Round(company="Metris Energy Ltd.", stage="seed", round_date="2026-09-20")
-    assert first.round_id == second.round_id
+def test_different_companies_never_collide():
+    acme = Round(company="Acme AI", stage="Seed", round_date="2026-09-20")
+    other = Round(company="Other AI", stage="Seed", round_date="2026-09-20")
+    assert acme.round_id_for("d:acme.ai") != other.round_id_for("d:other.ai")

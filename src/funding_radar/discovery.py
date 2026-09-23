@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from src.funding_radar.db import FundingDatabase
 from src.funding_radar.models import Article
-from src.funding_radar.sources.base import headline_key, http_client, load_config
+from src.funding_radar.sources.base import company_hint, headline_key, http_client, load_config
 from src.funding_radar.sources.feeds import fetch_google_news, fetch_rss
 from src.funding_radar.sources.gdelt import fetch_gdelt
 from src.funding_radar.sources.vc_pages import fetch_vc_page
@@ -191,11 +191,11 @@ def discover(db: FundingDatabase, config: dict, *, client=None, max_age_days: in
                 continue
             if not _is_recent(article, max_age_days):
                 stats["stale"] += 1
-                db.record_article(article.article_id, article.url, key, outcome="stale")
+                db.record_article(article, key, outcome="stale", company_hint=company_hint(article.title))
                 continue
             if not _mentions_funding(article, keywords):
                 stats["off_topic"] += 1
-                db.record_article(article.article_id, article.url, key, outcome="off_topic")
+                db.record_article(article, key, outcome="off_topic", company_hint=company_hint(article.title))
                 continue
             by_key[key] = Candidate(article=article)
 

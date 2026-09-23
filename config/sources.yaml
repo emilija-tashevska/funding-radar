@@ -6,7 +6,13 @@ filters:
   # Other currencies are converted roughly, only to apply the cut-off.
   min_amount: 2000000
   min_amount_currencies: [USD, GBP, EUR]
-  stages: [pre-seed, seed, seed extension, series a, series b]
+  # Company builders and pre-seed funds write much smaller first cheques, and their
+  # companies are the ones with no product leadership at all. Backing from one of
+  # these lowers the floor for that round.
+  investor_floors:
+    Antler: 300000
+    Entrepreneur First: 300000
+  stages: [pre-seed, seed, series a, series b]
   regions: [uk, europe]
   # Rounds stay on the site for this long.
   window_days: 120
@@ -77,6 +83,10 @@ rss:
   - {name: Seedcamp (feed), url: "https://seedcamp.com/feed/"}
   - {name: Point Nine (feed), url: "https://writing.pointnine.com/feed"}
   - {name: Air Street (feed), url: "https://press.airstreet.com/feed"}
+  - {name: Antler (feed), url: "https://www.antler.co/blog/rss.xml"}
+  - {name: Entrepreneur First (feed), url: "https://www.joinef.com/feed/"}
+  - {name: Hoxton Ventures (feed), url: "https://hoxtonventures.com/feed/"}
+  - {name: Frontline (feed), url: "https://frontline.vc/feed/"}
 
 # Google News searches. Widest reach of any source; polled gently.
 google_news:
@@ -109,7 +119,9 @@ google_news:
 
 # GDELT adds non-English European coverage.
 gdelt:
-  # Their limit is one request every 5 seconds; the client now paces itself.
+  # One request per 5 seconds, and it throttles an IP for a while after a burst.
+  # The client paces itself, but expect the odd failed run; it is a bonus source,
+  # never the backbone. Source health will show when it is unavailable.
   enabled: true
   timespan: "2d"
   queries:
@@ -129,6 +141,9 @@ vc_pages:
   - {name: EQT Ventures, url: "https://eqtgroup.com/news"}
   - {name: LocalGlobe, url: "https://www.phoenixcourt.vc/news"}
   - {name: Seedcamp, url: "https://seedcamp.com/views/?filter_type=news"}
+  - {name: Antler, url: "https://www.antler.co/insights"}
+  - {name: Entrepreneur First, url: "https://www.joinef.com/insights/"}
+  - {name: Octopus Ventures, url: "https://octopusventures.com/blog/"}
 
 # UK Companies House: verification and unannounced raises (needs COMPANIES_HOUSE_KEY).
 companies_house:

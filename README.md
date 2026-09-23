@@ -22,6 +22,31 @@ fractional product, pricing and growth practice.
 | Scoring | Claude Opus on survivors: fit score, one-line reason, and angle (product leadership / pricing / growth) |
 | Publish | Encrypted site bundle, Telegram digest, job-scanner suggestions |
 
+## Data model
+
+A company is the durable thing, a round is an event against it, an article is
+evidence for a round, and a score is an opinion about it at a point in time.
+
+| Table | Holds | Why separate |
+|---|---|---|
+| `companies` | Canonical name, aliases, domain, HQ, sector, AI-native | A company raises more than once, and later rounds should enrich one record rather than copy it |
+| `rounds` | Stage, amount, currency, date, confidence, confirmed, qualified | One row per raise |
+| `investors`, `round_investors` | Who backed it, who led | Lets rules key on the investor (Antler and EF lower the size floor) and answers "show me everything Antler backed" |
+| `round_sources` | Every article reporting the round, with the amount it stated | Corroboration, and how disagreements over the amount surface |
+| `articles` | Everything seen, and what happened to it | Stops the same story being paid for twice |
+| `scores` | Fit, angle, reason, model, rubric version | History: re-scoring adds a row, so a rubric change never erases what it said before |
+| `feedback` | Useful / not useful per round | Feeds later scoring |
+| `source_health`, `runs` | Per-source yield and run stats | A scraper that breaks shows up as "quiet", not as a silently shorter list |
+
+Identity rules, which is where this kind of pipeline usually rots:
+
+- A company is keyed on its **domain** when known, else its **normalised name**.
+  When a domain turns up later, the earlier record is **merged**, not duplicated.
+- A round is keyed on **company plus month**, and matched within a **±45-day window**,
+  so one raise reported on 30 September and again on 2 October stays one round.
+- **Stage is not part of the key.** Outlets disagree about seed versus Series A, and
+  a relabelled round is still the same round.
+
 ## Running it
 
 ```bash

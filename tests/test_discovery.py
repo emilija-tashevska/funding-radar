@@ -53,7 +53,7 @@ def test_an_article_already_handled_is_not_offered_again(db, monkeypatch):
     monkeypatch.setattr(discovery, "collect", _collect([SourceResult("TechCrunch", "rss", articles)]))
     first = discovery.discover(db, CONFIG)
     primary = first.candidates[0].article
-    db.record_article(primary.article_id, primary.url, "acme raises 12m series a", "extracted")
+    db.record_article(primary, "acme raises 12m series a", outcome="extracted")
     assert discovery.discover(db, CONFIG).candidates == []
 
 
