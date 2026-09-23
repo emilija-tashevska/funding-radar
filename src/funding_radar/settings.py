@@ -21,7 +21,9 @@ class Settings:
     # Extraction is high volume and mechanical; scoring is judgement on a handful.
     EXTRACT_MODEL: str = os.getenv("EXTRACT_MODEL", "claude-sonnet-5")
     SCORE_MODEL: str = os.getenv("SCORE_MODEL", "claude-opus-5")
-    LLM_EFFORT: str = os.getenv("LLM_EFFORT", "medium").strip().lower()
+    # Extraction is mechanical, so it runs cheap; scoring is judgement.
+    EXTRACT_EFFORT: str = os.getenv("EXTRACT_EFFORT", "low").strip().lower()
+    SCORE_EFFORT: str = os.getenv("SCORE_EFFORT", "medium").strip().lower()
 
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
