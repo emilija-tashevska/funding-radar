@@ -69,6 +69,11 @@ rss:
   - {name: Tech Funding News, url: "https://techfundingnews.com/feed/"}
   - {name: Silicon Canals, url: "https://siliconcanals.com/feed/"}
   - {name: Maddyness UK, url: "https://www.maddyness.com/uk/feed/"}
+  # Funds with a real feed. Mostly essays, but investment announcements appear here too.
+  - {name: Balderton (feed), url: "https://www.balderton.com/feed/"}
+  - {name: Seedcamp (feed), url: "https://seedcamp.com/feed/"}
+  - {name: Point Nine (feed), url: "https://writing.pointnine.com/feed"}
+  - {name: Air Street (feed), url: "https://press.airstreet.com/feed"}
 
 # Google News searches. Widest reach of any source; polled gently.
 google_news:
@@ -88,28 +93,26 @@ google_news:
 
 # GDELT adds non-English European coverage.
 gdelt:
-  enabled: true
+  # Rate-limited us repeatedly from one IP; off until the backoff is proven in CI.
+  enabled: false
   timespan: "2d"
   queries:
     - '("raises" OR "funding round" OR "secures funding") (seed OR "series a" OR "series b")'
 
 # Fund announcement pages: often the first public word, and they name the investor.
 vc_pages:
+  # Only funds whose pages carry "our investment in X" posts, with verified URLs.
+  # Yield is low next to Google News; kept because they are often first and name the investor.
   - {name: Index Ventures, url: "https://www.indexventures.com/perspectives/"}
-  - {name: Balderton, url: "https://www.balderton.com/news/"}
-  - {name: LocalGlobe, url: "https://localglobe.vc/news/"}
-  - {name: Seedcamp, url: "https://seedcamp.com/resources/"}
-  - {name: Accel, url: "https://www.accel.com/noteworthy"}
-  - {name: Notion Capital, url: "https://notion.vc/news/"}
-  - {name: Dawn Capital, url: "https://dawncapital.com/news/"}
-  - {name: Air Street Capital, url: "https://www.airstreet.com/blog"}
-  - {name: Atomico, url: "https://atomico.com/insights/"}
+  - {name: Accel, url: "https://www.accel.com/news"}
+  - {name: Atomico, url: "https://atomico.com/insights"}
   - {name: Creandum, url: "https://creandum.com/stories/"}
-  - {name: Northzone, url: "https://northzone.com/news/"}
-  - {name: EQT Ventures, url: "https://eqtgroup.com/news"}
-  - {name: Point Nine, url: "https://www.pointnine.com/blog"}
+  - {name: Northzone, url: "https://northzone.com/insights"}
   - {name: Cherry Ventures, url: "https://www.cherry.vc/news"}
-  - {name: Speedinvest, url: "https://www.speedinvest.com/blog"}
+  - {name: Speedinvest, url: "https://www.speedinvest.com/knowledge"}
+  - {name: EQT Ventures, url: "https://eqtgroup.com/news"}
+  - {name: LocalGlobe, url: "https://www.phoenixcourt.vc/news"}
+  - {name: Seedcamp, url: "https://seedcamp.com/views/?filter_type=news"}
 
 # UK Companies House: verification and unannounced raises (needs COMPANIES_HOUSE_KEY).
 companies_house:
