@@ -13,7 +13,19 @@ logger = logging.getLogger(__name__)
 
 GDELT_DOC_API = "https://api.gdeltproject.org/api/v2/doc/doc"
 MAX_RECORDS = 75
-RETRY_WAITS = (5, 15)
+RETRY_WAITS = (7, 20)
+# GDELT answers 429 with "limit requests to one every 5 seconds". That budget is per
+# client, not per query, so the gap is held across every call in a run.
+MIN_SECONDS_BETWEEN_CALLS = 6.0
+_last_call_at = 0.0
+
+
+def _wait_for_slot() -> None:
+    global _last_call_at
+    elapsed = time.monotonic() - _last_call_at
+    if _last_call_at and elapsed < MIN_SECONDS_BETWEEN_CALLS:
+        time.sleep(MIN_SECONDS_BETWEEN_CALLS - elapsed)
+    _last_call_at = time.monotonic()
 
 
 def fetch_gdelt(query: str, timespan: str, *, client=None) -> SourceResult:
@@ -33,6 +45,7 @@ def fetch_gdelt(query: str, timespan: str, *, client=None) -> SourceResult:
         for attempt, wait in enumerate((0, *RETRY_WAITS)):
             if wait:
                 time.sleep(wait)
+            _wait_for_slot()
             response = client.get(url)
             if response.status_code == 429:
                 logger.info("%s: rate limited, backing off", name)

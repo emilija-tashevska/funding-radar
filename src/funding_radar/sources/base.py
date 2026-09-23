@@ -81,3 +81,49 @@ class SourceResult:
     kind: str
     articles: list
     error: str = ""
+
+
+# "London's Metris Energy raises €4.35 million ..." -> "metris energy".
+# These run against the normalised key, where punctuation is already gone, so a
+# possessive reads as "london s" and a compound as "berlin based".
+_PREFIX_RES = (
+    re.compile(r"^(?:exclusive|breaking|update|just in)\s+"),
+    re.compile(r"^[a-z]+\s+s\s+"),          # "london s"  <- "London's"
+    re.compile(r"^[a-z]+\s+based\s+"),      # "berlin based" <- "Berlin-based"
+    re.compile(
+        r"^(?:uk|us|eu|british|dutch|french|german|swedish|danish|norwegian|finnish|"
+        r"spanish|italian|irish|swiss|polish|estonian|icelandic|london|berlin|paris|"
+        r"amsterdam|stockholm|madrid|dublin|munich|helsinki|copenhagen|oslo|zurich|"
+        r"milan|barcelona|lisbon|warsaw|tallinn|manchester|cambridge|oxford)\s+"
+    ),
+    re.compile(
+        r"^(?:ai|fintech|healthtech|insurtech|traveltech|deeptech|climate|legal|cyber|"
+        r"defence|defense|biotech|edtech|proptech|adtech|foodtech|agritech|cloud|saas)\s+"
+        r"(?:startup|scaleup|company|firm|platform|group|business)?\s*"
+    ),
+)
+_FUNDING_VERB_SPLIT_RE = re.compile(
+    r"\b(raises?|raised|raising|secures?|secured|closes?|closed|lands?|landed|nets?|netted|"
+    r"bags?|bagged|announces?|announced|valued|becomes|hits|picks up|scores?|gets|receives|"
+    r"doubles|triples|quadruples|quintuples|nearly|valuation|valued at)\b"
+)
+
+
+def company_hint(title: str) -> str:
+    """Best guess at the company name from a headline, for coarse matching.
+
+    Headlines vary across outlets ("raises £8m" vs "raises $11M"), so comparing
+    them directly understates coverage; the company name is the stable part.
+    """
+    cleaned = headline_key(title)
+    changed = True
+    while changed:
+        changed = False
+        for pattern in _PREFIX_RES:
+            stripped = pattern.sub("", cleaned, count=1).strip()
+            if stripped != cleaned and stripped:
+                cleaned, changed = stripped, True
+    head = _FUNDING_VERB_SPLIT_RE.split(cleaned)[0].strip()
+    words = head.split()
+    # Company names are short; anything longer is usually a sentence about a sector.
+    return " ".join(words[:4]) if words else ""

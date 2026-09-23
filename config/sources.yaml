@@ -66,8 +66,11 @@ rss:
   - {name: EU-Startups, url: "https://www.eu-startups.com/feed/"}
   - {name: Crunchbase News, url: "https://news.crunchbase.com/sections/venture/feed/"}
   - {name: UKTN, url: "https://www.uktech.news/feed"}
-  - {name: Tech Funding News, url: "https://techfundingnews.com/feed/"}
   - {name: Silicon Canals, url: "https://siliconcanals.com/feed/"}
+  - {name: Finsmes, url: "https://www.finsmes.com/feed"}
+  - {name: UKTN Funding, url: "https://www.uktech.news/funding/feed"}
+  - {name: The Recursive, url: "https://therecursive.com/feed/"}
+  - {name: Sifted Funding, url: "https://sifted.eu/sector/funding/feed"}
   - {name: Maddyness UK, url: "https://www.maddyness.com/uk/feed/"}
   # Funds with a real feed. Mostly essays, but investment announcements appear here too.
   - {name: Balderton (feed), url: "https://www.balderton.com/feed/"}
@@ -78,7 +81,7 @@ rss:
 # Google News searches. Widest reach of any source; polled gently.
 google_news:
   locale: {hl: "en-GB", gl: "GB", ceid: "GB:en"}
-  window: "when:2d"
+  window: "when:3d"
   queries:
     - '"raises" ("seed" OR "series a" OR "series b") startup London'
     - '"raises" ("seed" OR "series a" OR "series b") startup UK'
@@ -90,11 +93,24 @@ google_news:
     - '"led by" ("seed round" OR "Series A") Berlin OR Paris OR Amsterdam OR Stockholm'
     - '"Series B" raises startup UK'
     - 'fintech OR healthtech OR "developer tools" raises "Series A" Europe'
+    - '"raises" startup Paris OR Amsterdam OR Stockholm OR Madrid funding'
+    - '"secures" funding startup Manchester OR Edinburgh OR Bristol OR Cambridge'
+    - '"raises" million startup Britain OR Ireland OR Netherlands OR Germany OR France'
+    - '"raises" million startup Spain OR Italy OR Sweden OR Denmark OR Portugal OR Poland'
+    - '"venture debt" OR "growth round" OR "extension round" startup Europe raises'
+    - 'European startup "funding round" led by investors' 
+  # Rounds reported only in the local language never reach the English feeds.
+  extra_locales:
+    - {hl: "de", gl: "DE", ceid: "DE:de", query: 'startup "Millionen" Finanzierungsrunde'}
+    - {hl: "fr", gl: "FR", ceid: "FR:fr", query: 'startup "levée de fonds" millions'}
+    - {hl: "nl", gl: "NL", ceid: "NL:nl", query: 'startup investering miljoen ophaalt'}
+    - {hl: "sv", gl: "SE", ceid: "SE:sv", query: 'startup finansieringsrunda miljoner'}
+    - {hl: "es", gl: "ES", ceid: "ES:es", query: 'startup "ronda de financiación" millones'}
 
 # GDELT adds non-English European coverage.
 gdelt:
-  # Rate-limited us repeatedly from one IP; off until the backoff is proven in CI.
-  enabled: false
+  # Their limit is one request every 5 seconds; the client now paces itself.
+  enabled: true
   timespan: "2d"
   queries:
     - '("raises" OR "funding round" OR "secures funding") (seed OR "series a" OR "series b")'

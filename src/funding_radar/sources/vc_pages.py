@@ -27,11 +27,15 @@ SKIP_URL_RE = re.compile(
 DATE_ATTRS = ("datetime", "data-date", "data-published")
 
 
+# Fund sites are slower than feeds; Atomico needs well over the default.
+PAGE_TIMEOUT = 45.0
+
+
 def fetch_vc_page(name: str, url: str, *, client=None) -> SourceResult:
     own_client = client is None
     client = client or http_client()
     try:
-        response = client.get(url)
+        response = client.get(url, timeout=PAGE_TIMEOUT)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "lxml")
         host = urlparse(url).netloc

@@ -33,15 +33,17 @@ def test_only_recent_on_topic_new_articles_survive(db, monkeypatch):
         _collect([
             SourceResult("TechCrunch", "rss", [
                 _article("Acme raises $12M Series A", "https://tc.test/acme"),
-                _article("Acme raises $12M Series A - UKTN", "https://uktn.test/acme"),  # same story
+                _article("Acme raises $12M Series A - UKTN", "https://uktn.test/acme", source="UKTN"),  # same story
                 _article("Our thoughts on hiring juniors", "https://tc.test/opinion"),   # off topic
                 _article("Beta raises seed funding", "https://tc.test/beta", published=old),  # stale
             ]),
         ]),
     )
     result = discovery.discover(db, CONFIG)
-    assert [a.url for a in result.candidates] == ["https://tc.test/acme"]
+    assert [c.article.url for c in result.candidates] == ["https://tc.test/acme"]
     assert result.stats["duplicates"] == 1
+    # The second outlet is kept against the same story as corroboration.
+    assert result.candidates[0].source_count == 2
     assert result.stats["off_topic"] == 1
     assert result.stats["stale"] == 1
 
@@ -50,7 +52,8 @@ def test_an_article_already_handled_is_not_offered_again(db, monkeypatch):
     articles = [_article("Acme raises $12M Series A", "https://tc.test/acme")]
     monkeypatch.setattr(discovery, "collect", _collect([SourceResult("TechCrunch", "rss", articles)]))
     first = discovery.discover(db, CONFIG)
-    db.record_article(first.candidates[0].article_id, first.candidates[0].url, "acme raises 12m series a", "extracted")
+    primary = first.candidates[0].article
+    db.record_article(primary.article_id, primary.url, "acme raises 12m series a", "extracted")
     assert discovery.discover(db, CONFIG).candidates == []
 
 
@@ -105,3 +108,56 @@ def test_real_funding_headlines_pass_the_gate(text):
 )
 def test_marketing_and_commentary_do_not(text):
     assert not discovery.looks_like_funding(text)
+
+
+def test_a_direct_link_is_preferred_over_a_google_redirect(db, monkeypatch):
+    google = _article("Acme raises $12M Series A", "https://news.google.com/rss/articles/CBMi", source="Google News · Reuters", kind="google_news")
+    direct = _article("Acme raises $12M Series A - Sifted", "https://sifted.eu/acme", source="Sifted")
+    monkeypatch.setattr(
+        discovery,
+        "collect",
+        _collect([SourceResult("Google News: q", "google_news", [google]), SourceResult("Sifted", "rss", [direct])]),
+    )
+    candidate = discovery.discover(db, CONFIG).candidates[0]
+    assert candidate.article.url == "https://sifted.eu/acme"
+    assert [a.source_kind for a in candidate.duplicates] == ["google_news"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Spiich erhält 3 Millionen Euro für Vertriebs-KI-Agenten",
+        "PRIMO lève près de 7 millions d’euros pour son IT",
+        "Antwerps Apicbase haalt 4 miljoen op bij investeerders",
+        "Svenska Terasi hämtar in 11 miljoner i finansieringsrunda",
+    ],
+)
+def test_non_english_funding_headlines_pass_the_gate(text):
+    assert discovery.looks_like_funding(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Exclusive: Connect Ventures raises $55m in first close of fifth fund to chase deeptech",
+        "Balderton closes $1.3bn fund to back European founders",
+        "Seedcamp announces Fund VI at $180M",
+        "New VC firm raises debut fund of €100M",
+    ],
+)
+def test_vc_funds_raising_their_own_money_are_not_prospects(text):
+    assert discovery.looks_like_fund_raise(text)
+    assert not discovery.looks_like_funding(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Fundamental raises $12M Series A led by Index",
+        "Crusoe raises $3.9B to build data centers",
+        "Basecamp Research raises $140M Series C",
+    ],
+)
+def test_operating_companies_are_not_mistaken_for_funds(text):
+    assert not discovery.looks_like_fund_raise(text)
+    assert discovery.looks_like_funding(text)

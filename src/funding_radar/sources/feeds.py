@@ -8,7 +8,7 @@ import urllib.parse
 import feedparser
 
 from src.funding_radar.models import Article
-from src.funding_radar.sources.base import SourceResult, strip_html, to_iso
+from src.funding_radar.sources.base import SourceResult, http_client, strip_html, to_iso
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +40,26 @@ def _entries_to_articles(entries: list, source: str, kind: str) -> list[Article]
     return articles
 
 
-def fetch_rss(name: str, url: str) -> SourceResult:
+def fetch_rss(name: str, url: str, *, client=None) -> SourceResult:
+    """Fetch a feed, then retry through httpx if the feed library is blocked.
+
+    Publishers block inconsistently: Finsmes serves feedparser but 403s a browser
+    user agent, Silicon Canals does the opposite. Trying both covers each case.
+    """
     try:
         parsed = feedparser.parse(url)
-        if getattr(parsed, "bozo", 0) and not parsed.entries:
-            raise RuntimeError(str(getattr(parsed, "bozo_exception", "unparseable feed"))[:200])
+        if not parsed.entries:
+            own_client = client is None
+            client = client or http_client()
+            try:
+                response = client.get(url)
+                response.raise_for_status()
+                parsed = feedparser.parse(response.text)
+            finally:
+                if own_client:
+                    client.close()
+        if not parsed.entries:
+            raise RuntimeError(str(getattr(parsed, "bozo_exception", "no entries"))[:200])
         return SourceResult(name, "rss", _entries_to_articles(parsed.entries, name, "rss"))
     except Exception as exc:  # noqa: BLE001 - one broken feed must not stop the run
         logger.warning("%s: feed failed: %s", name, exc)

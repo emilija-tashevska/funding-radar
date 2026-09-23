@@ -99,7 +99,7 @@ class _Client:
     def __init__(self, response):
         self._response = response
 
-    def get(self, url):
+    def get(self, url, **kwargs):
         return self._response
 
 
@@ -123,3 +123,30 @@ def test_gdelt_returns_articles_and_reports_html_error_pages():
 
     bad = gdelt.fetch_gdelt("q", "2d", client=_Client(_Resp(text="<html>error</html>")))
     assert bad.articles == [] and "non-JSON" in bad.error
+
+
+@pytest.mark.parametrize(
+    "title,expected",
+    [
+        ("London’s Metris Energy raises €4.35 million to scale AI platform", "metris energy"),
+        ("Metris Energy raises $5M seed to unify fragmented energy data - Dealroom", "metris energy"),
+        ("Berlin-based mika raises €6 million to scale its AI-native tax alternative", "mika"),
+        ("Exclusive: NIF backs defence startup Terasi in €11m raise", "nif backs defence startup"),
+        ("Magic AI raises £8m to take its fitness mirror to the US", "magic ai"),
+        ("Magic AI raises $11M to take its hologram fitness mirror to the US", "magic ai"),
+        ("AI startup Mantic raises $25 million for superhuman forecasting", "mantic"),
+    ],
+)
+def test_company_hint_survives_different_headlines(title, expected):
+    from src.funding_radar.sources.base import company_hint
+
+    assert company_hint(title) == expected
+
+
+def test_valuation_headlines_still_resolve_to_the_company():
+    from src.funding_radar.sources.base import company_hint
+
+    # Same company, three headline shapes; coarse matching has to see one company.
+    assert company_hint("Tekever nearly quintuples valuation to $6.4B with $580M round") == "tekever"
+    assert company_hint("TEKEVER raises $580M Series D at $6.4B valuation") == "tekever"
+    assert company_hint("Heidi valuation doubles to $900M on $340M funding round") == "heidi"
