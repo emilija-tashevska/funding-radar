@@ -26,6 +26,17 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def is_more_specific(name_key: str, other_key: str) -> bool:
+    """True when one name is the other plus a qualifier: "kasvu" / "kasvu therapeutics".
+
+    Whole words only, so "meta" does not swallow "metabolic".
+    """
+    if not name_key or not other_key or name_key == other_key:
+        return False
+    longer, shorter = (name_key, other_key) if len(name_key) > len(other_key) else (other_key, name_key)
+    return longer.startswith(shorter + " ")
+
+
 def company_id_for(domain: str, name: str) -> str:
     """Domain when we have one, else the normalised name. Stable across runs."""
     domain = normalize_domain(domain)
@@ -94,6 +105,11 @@ class FundingDatabase:
                 "SELECT * FROM companies WHERE name_key = ? OR aliases LIKE ?",
                 (name_key, f'%"{name_key}"%'),
             ).fetchone()
+        if not existing:
+            # "Kasvu raises EUR 30M" and "Kasvu Therapeutics raises EUR 30M" are one
+            # company. The name alone would be too weak to merge on, so the same
+            # amount at the same time has to agree with it.
+            existing = self._find_by_qualifier_and_amount(name_key, round_)
 
         if existing is None:
             self._conn.execute(
@@ -116,6 +132,10 @@ class FundingDatabase:
             self.merge_companies(existing["company_id"], new_id, round_)
             company_id = new_id
         aliases = set(json.loads(existing["aliases"] or "[]")) | {name_key}
+        # "Kasvu Therapeutics" says more than "Kasvu", whichever arrived last.
+        incoming_name = round_.company
+        if is_more_specific(existing["name_key"], name_key) and len(existing["name_key"]) > len(name_key):
+            incoming_name = existing["canonical_name"]
         self._conn.execute(
             """
             UPDATE companies SET
@@ -132,12 +152,34 @@ class FundingDatabase:
                 last_seen_at = ?
             WHERE company_id = ?
             """,
-            (round_.company, domain, json.dumps(sorted(aliases)), round_.summary, round_.hq_city,
+            (incoming_name, domain, json.dumps(sorted(aliases)), round_.summary, round_.hq_city,
              round_.hq_country, round_.region, round_.sector, int(round_.ai_native),
              int(looks_like_studio(round_.company, round_.summary)), now, company_id),
         )
         self._conn.commit()
         return company_id
+
+    def _find_by_qualifier_and_amount(self, name_key: str, round_: Round):
+        """A company whose name is this one plus (or minus) a qualifier, raising the same money."""
+        if not name_key or not round_.amount_value:
+            return None
+        rows = self._conn.execute(
+            """
+            SELECT c.*, r.announced_date FROM companies c
+            JOIN rounds r ON r.company_id = c.company_id
+            WHERE r.amount_value = ? AND COALESCE(NULLIF(r.currency, ''), 'USD') = ?
+            """,
+            (round_.amount_value, (round_.currency or "USD").upper()),
+        ).fetchall()
+        target = _parse(round_.round_date)
+        for row in rows:
+            if not is_more_specific(name_key, row["name_key"]):
+                continue
+            other = _parse(row["announced_date"])
+            if target and other and abs((target - other).days) > SAME_ROUND_WINDOW_DAYS:
+                continue
+            return row
+        return None
 
     def merge_companies(self, old_id: str, new_id: str, round_: Round) -> None:
         """Re-key a company (and its rounds) once a better identity is known."""
@@ -159,6 +201,131 @@ class FundingDatabase:
         self._conn.execute("UPDATE rounds SET company_id = ? WHERE company_id = ?", (new_id, old_id))
         self._conn.execute("DELETE FROM companies WHERE company_id = ?", (old_id,))
         self._conn.commit()
+
+    def absorb_company(self, source_id: str, target_id: str) -> int:
+        """Fold one company into another, keeping every round, source and investor.
+
+        Used when the same company was first seen under two names. The target keeps
+        its identity and canonical name; anything it is missing is taken from the
+        source. Returns how many rounds collapsed into an existing one.
+        """
+        source = self._conn.execute("SELECT * FROM companies WHERE company_id = ?", (source_id,)).fetchone()
+        target = self._conn.execute("SELECT * FROM companies WHERE company_id = ?", (target_id,)).fetchone()
+        if source is None or target is None or source_id == target_id:
+            return 0
+        aliases = (set(json.loads(target["aliases"] or "[]")) | set(json.loads(source["aliases"] or "[]"))
+                   | {source["name_key"], target["name_key"]})
+        self._conn.execute(
+            """
+            UPDATE companies SET
+                aliases = ?,
+                domain = COALESCE(NULLIF(domain, ''), ?),
+                summary = COALESCE(NULLIF(summary, ''), ?),
+                hq_city = COALESCE(NULLIF(hq_city, ''), ?),
+                hq_country = COALESCE(NULLIF(hq_country, ''), ?),
+                region = COALESCE(NULLIF(region, ''), ?),
+                sector = COALESCE(NULLIF(sector, ''), ?),
+                ai_native = MAX(ai_native, ?),
+                is_studio = MAX(is_studio, ?),
+                first_seen_at = MIN(first_seen_at, ?),
+                last_seen_at = ?
+            WHERE company_id = ?
+            """,
+            (json.dumps(sorted(a for a in aliases if a)), source["domain"], source["summary"],
+             source["hq_city"], source["hq_country"], source["region"], source["sector"],
+             source["ai_native"], source["is_studio"], source["first_seen_at"], _now(), target_id),
+        )
+        self._conn.execute("UPDATE rounds SET company_id = ? WHERE company_id = ?", (target_id, source_id))
+        collapsed = self.collapse_rounds(target_id)
+        self._conn.execute("DELETE FROM companies WHERE company_id = ?", (source_id,))
+        self._conn.commit()
+        return collapsed
+
+    def collapse_rounds(self, company_id: str) -> int:
+        """Fold rounds of one company that fall inside the same window into one."""
+        rows = self._conn.execute(
+            "SELECT * FROM rounds WHERE company_id = ? ORDER BY first_seen_at", (company_id,)
+        ).fetchall()
+        kept: list[dict] = []
+        collapsed = 0
+        for row in rows:
+            row = dict(row)
+            target = next((k for k in kept if _same_round(k, row)), None)
+            if target is None:
+                kept.append(row)
+                continue
+            self._absorb_round(row, target)
+            collapsed += 1
+        return collapsed
+
+    def _absorb_round(self, source: dict, target: dict) -> None:
+        """Move one round's evidence onto another, keeping the fuller description."""
+        self._conn.execute(
+            """
+            UPDATE rounds SET
+                stage = COALESCE(NULLIF(stage, ''), ?),
+                stage_raw = COALESCE(NULLIF(stage_raw, ''), ?),
+                amount_value = COALESCE(amount_value, ?),
+                currency = COALESCE(NULLIF(currency, ''), ?),
+                amount_usd = COALESCE(amount_usd, ?),
+                announced_date = MIN(COALESCE(announced_date, ?), COALESCE(?, announced_date)),
+                summary = COALESCE(NULLIF(summary, ''), ?),
+                evidence = COALESCE(NULLIF(evidence, ''), ?),
+                confidence = MAX(confidence, ?),
+                last_seen_at = ?
+            WHERE round_id = ?
+            """,
+            (source["stage"], source["stage_raw"], source["amount_value"], source["currency"],
+             source["amount_usd"], source["announced_date"], source["announced_date"],
+             source["summary"], source["evidence"], source["confidence"], _now(), target["round_id"]),
+        )
+        # Move the evidence before the delete, or the cascade takes it with the round.
+        for table in ("round_sources", "round_investors", "scores", "articles"):
+            self._conn.execute(f"UPDATE OR IGNORE {table} SET round_id = ? WHERE round_id = ?",
+                               (target["round_id"], source["round_id"]))
+        self._conn.execute("DELETE FROM rounds WHERE round_id = ?", (source["round_id"],))
+
+    def duplicate_company_pairs(self) -> list[tuple[str, str]]:
+        """(source, target) company pairs that are one company under two names.
+
+        The name being a qualified version of the other is not enough on its own, so
+        the pair must also share a round: same money, same time.
+        """
+        rows = [dict(row) for row in self._conn.execute(
+            """
+            SELECT c.company_id, c.name_key, c.domain, r.amount_value, r.currency, r.announced_date
+            FROM companies c JOIN rounds r ON r.company_id = c.company_id
+            WHERE r.amount_value IS NOT NULL
+            """
+        ).fetchall()]
+        pairs: list[tuple[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for first in rows:
+            for second in rows:
+                if first["company_id"] == second["company_id"]:
+                    continue
+                if not is_more_specific(second["name_key"], first["name_key"]):
+                    continue  # second is the fuller name
+                if len(second["name_key"]) <= len(first["name_key"]):
+                    continue
+                if first["amount_value"] != second["amount_value"]:
+                    continue
+                if (first["currency"] or "USD") != (second["currency"] or "USD"):
+                    continue
+                if first["domain"] and second["domain"] and first["domain"] != second["domain"]:
+                    continue  # two real companies with similar names
+                one, other = _parse(first["announced_date"]), _parse(second["announced_date"])
+                if one and other and abs((one - other).days) > SAME_ROUND_WINDOW_DAYS:
+                    continue
+                # Keep the one with a domain; otherwise keep the fuller name.
+                source, target = first["company_id"], second["company_id"]
+                if first["domain"] and not second["domain"]:
+                    source, target = target, source
+                if (source, target) in seen or (target, source) in seen:
+                    continue
+                seen.add((source, target))
+                pairs.append((source, target))
+        return pairs
 
     def get_company(self, company_id: str) -> dict | None:
         row = self._conn.execute("SELECT * FROM companies WHERE company_id = ?", (company_id,)).fetchone()
@@ -217,7 +384,8 @@ class FundingDatabase:
                     currency = COALESCE(NULLIF(?, ''), currency),
                     amount_text = COALESCE(NULLIF(?, ''), amount_text),
                     amount_usd = COALESCE(?, amount_usd),
-                    announced_date = COALESCE(announced_date, ?),
+                    -- The earliest report is the one nearest the announcement.
+                    announced_date = MIN(COALESCE(announced_date, ?), COALESCE(?, announced_date)),
                     summary = COALESCE(NULLIF(?, ''), summary),
                     evidence = COALESCE(NULLIF(?, ''), evidence),
                     confidence = MAX(confidence, ?),
@@ -228,7 +396,8 @@ class FundingDatabase:
                 WHERE round_id = ?
                 """,
                 (round_.stage, round_.stage_raw, round_.amount_value, round_.currency,
-                 round_.amount_text, round_.amount_usd, round_.round_date, round_.summary,
+                 round_.amount_text, round_.amount_usd, round_.round_date, round_.round_date,
+                 round_.summary,
                  round_.evidence, round_.confidence, int(round_.confirmed),
                  int(round_.amount_disputed), int(round_.qualified), now, round_id),
             )
@@ -513,6 +682,15 @@ class FundingDatabase:
             (run_id, started_at, _now(), json.dumps(stats)),
         )
         self._conn.commit()
+
+
+def _same_round(first: dict, second: dict) -> bool:
+    """Two rounds of one company close enough in time to be the same raise."""
+    one, other = _parse(first.get("announced_date")), _parse(second.get("announced_date"))
+    if one and other:
+        return abs((one - other).days) <= SAME_ROUND_WINDOW_DAYS
+    stage = (first.get("stage") or "").lower()
+    return bool(stage) and stage == (second.get("stage") or "").lower()
 
 
 def _parse(value: str | None) -> datetime | None:

@@ -60,6 +60,18 @@ pytest -m live           # hits the real sources
 Configuration lives in [`config/sources.yaml`](config/sources.yaml): sources, filters,
 the fund list, and the fixed sector list the model assigns from.
 
+## Maintenance
+
+```bash
+python -m src.funding_radar.cli recheck   # re-apply the rules to stored rounds
+python -m src.funding_radar.cli dedupe    # fold companies stored under two names
+```
+
+Neither calls a model. `recheck` is what to run after changing the brief or the
+parsing; `dedupe` merges a company seen as both "Kasvu" and "Kasvu Therapeutics",
+which is only done when the two also share a round of the same size at the same
+time.
+
 ## Accuracy
 
 `tests/fixtures/labelled_articles.json` holds 20 real articles labelled by hand from

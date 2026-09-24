@@ -24,6 +24,7 @@ def main() -> None:
 
     sub.add_parser("sources", help="Per-source health from the last run")
     sub.add_parser("recheck", help="Re-apply the rules to stored rounds (no model calls)")
+    sub.add_parser("dedupe", help="Merge companies stored twice under two names")
 
     site_p = sub.add_parser("site", help="Build the static dashboard")
     site_p.add_argument("--days", type=int, default=120)
@@ -71,6 +72,12 @@ def main() -> None:
 
         with FundingDatabase(settings.DATABASE_PATH) as db:
             print(json.dumps(recheck(db), indent=2))
+
+    elif args.command == "dedupe":
+        from src.funding_radar.pipeline import dedupe
+
+        with FundingDatabase(settings.DATABASE_PATH) as db:
+            print(json.dumps(dedupe(db), indent=2))
 
     elif args.command == "site":
         from src.funding_radar.site import build

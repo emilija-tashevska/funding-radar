@@ -143,3 +143,20 @@ def recheck(db: FundingDatabase, config: dict | None = None) -> dict:
         db.set_round_flags(row["round_id"], confirmed=confirmed, amount_disputed=disputed,
                            qualified=verdict.qualified, qualified_reason=verdict.reason)
     return changed
+
+
+def dedupe(db: FundingDatabase, config: dict | None = None) -> dict:
+    """Fold companies stored twice under two names into one, then re-apply the rules.
+
+    "Kasvu" and "Kasvu Therapeutics" reported the same EUR 30M on the same day: one
+    company, one round, two names. Nothing is re-extracted and no model is called.
+    """
+    stats = {"companies_merged": 0, "rounds_collapsed": 0}
+    for source_id, target_id in db.duplicate_company_pairs():
+        if db.get_company(source_id) is None or db.get_company(target_id) is None:
+            continue  # already folded in by an earlier pair
+        stats["rounds_collapsed"] += db.absorb_company(source_id, target_id)
+        stats["companies_merged"] += 1
+    if stats["companies_merged"]:
+        stats.update(recheck(db, config))
+    return stats

@@ -222,3 +222,82 @@ def test_a_studio_company_carries_its_flag_into_the_round_list(db):
     company_id = db.upsert_company(round_)
     db.upsert_round(round_, company_id)
     assert db.list_rounds(window_days=120)[0]["is_studio"] == 1
+
+
+def _round_for(company, amount, date="2026-09-24T00:00:00+00:00", **kw):
+    from src.funding_radar.models import Round
+
+    return Round(company=company, amount_value=amount, currency=kw.pop("currency", "EUR"),
+                 round_date=date, **kw)
+
+
+def test_a_name_plus_a_qualifier_is_the_same_company_when_the_round_agrees(db):
+    """Tech.eu said "Kasvu", EU-Startups said "Kasvu Therapeutics": one EUR 30M round."""
+    first = _round_for("Kasvu", 30_000_000)
+    first_id = db.upsert_company(first)
+    db.upsert_round(first, first_id)
+    second = _round_for("Kasvu Therapeutics", 30_000_000, stage="series a")
+    second_id = db.upsert_company(second)
+    assert second_id == first_id
+    assert db.get_company(first_id)["canonical_name"] == "Kasvu Therapeutics"  # the fuller name wins
+    assert "kasvu" in db.get_company(first_id)["aliases"]
+
+
+def test_a_similar_name_with_a_different_round_stays_a_different_company(db):
+    first = _round_for("Meta", 10_000_000)
+    db.upsert_round(first, db.upsert_company(first))
+    second = _round_for("Meta Materials", 50_000_000)
+    assert db.upsert_company(second) != db.upsert_company(first)
+
+
+def test_a_qualifier_must_be_a_whole_word(db):
+    first = _round_for("Meta", 10_000_000)
+    db.upsert_round(first, db.upsert_company(first))
+    second = _round_for("Metabolic", 10_000_000)
+    assert db.upsert_company(second) != db.upsert_company(first)
+
+
+def test_two_companies_with_their_own_domains_are_never_folded_together(db):
+    first = _round_for("Orbit", 5_000_000, company_domain="orbit.com")
+    db.upsert_round(first, db.upsert_company(first))
+    second = _round_for("Orbit Systems", 5_000_000, company_domain="orbitsystems.io")
+    db.upsert_round(second, db.upsert_company(second))
+    assert db.duplicate_company_pairs() == []
+
+
+def test_folding_a_company_keeps_every_source_investor_and_the_earliest_date(db):
+    from src.funding_radar.models import Article
+
+    def article(url, outlet):
+        return Article(source=outlet, source_kind="rss", title=f"{outlet} on Kasvu", url=url,
+                       published_at="2026-09-24T00:00:00+00:00")
+
+    thin = _round_for("Kasvu", 30_000_000, date="2026-09-25T00:00:00+00:00")
+    thin_id = db.upsert_company(thin)
+    thin_round, _ = db.upsert_round(thin, thin_id)
+    db.add_round_source(thin_round, article("https://tech.eu/kasvu", "Tech.eu"), 30_000_000, "EUR")
+    db.link_investors(thin_round, ["Nordic Ventures"])
+
+    full = _round_for("Kasvu Therapeutics", 30_000_000, stage="series a",
+                      date="2026-09-24T00:00:00+00:00", summary="Cancer therapeutics")
+    full_id = db.upsert_company(full)          # matches the thin one, so this is a merge
+    full_round, _ = db.upsert_round(full, full_id)
+    db.add_round_source(full_round, article("https://eu-startups.com/kasvu", "EU-Startups"), 30_000_000, "EUR")
+
+    rounds = db.list_rounds(window_days=120)
+    assert len(rounds) == 1, "one company, one round"
+    kept = rounds[0]
+    assert kept["stage"] == "series a" and kept["summary"] == "Cancer therapeutics"
+    assert kept["announced_date"].startswith("2026-09-24")  # the earlier report
+    assert {s["outlet"] for s in kept["sources"]} == {"Tech.eu", "EU-Startups"}
+    assert kept["investors"] == ["Nordic Ventures"]
+    assert db.distinct_outlets(kept["round_id"]) == 2
+
+
+def test_a_round_keeps_the_earliest_date_it_was_reported_on(db):
+    late = _round_for("Acme AI", 12_000_000, date="2026-09-25T00:00:00+00:00")
+    company_id = db.upsert_company(late)
+    round_id, _ = db.upsert_round(late, company_id)
+    early = _round_for("Acme AI", 12_000_000, date="2026-09-22T00:00:00+00:00")
+    db.upsert_round(early, company_id)
+    assert db.get_round(round_id)["announced_date"].startswith("2026-09-22")
