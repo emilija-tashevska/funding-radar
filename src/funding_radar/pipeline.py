@@ -14,7 +14,7 @@ from src.funding_radar.db import FundingDatabase
 from src.funding_radar.discovery import discover
 from src.funding_radar.extract import extract
 from src.funding_radar.models import Round
-from src.funding_radar.qualify import Rules, approx_usd, is_confirmed, qualifies
+from src.funding_radar.qualify import Rules, comparable_usd, is_confirmed, qualifies
 from src.funding_radar.settings import settings
 from src.funding_radar.sources.base import company_hint, headline_key, load_config
 
@@ -35,11 +35,23 @@ def register_tracked_investors(db: FundingDatabase, config: dict) -> None:
 
 def _amounts_disagree(sources: list[dict]) -> bool:
     """Outlets convert currencies, so compare in one of them before crying foul."""
-    values = [usd for usd in (approx_usd(s.get("amount_value"), s.get("currency") or "USD")
+    values = [usd for usd in (comparable_usd(s.get("amount_value"), s.get("currency") or "USD")
                               for s in sources) if usd]
     if len(values) < 2:
         return False
     return (max(values) - min(values)) / max(values) > AMOUNT_DISAGREEMENT
+
+
+def round_from_row(row: dict) -> Round | None:
+    """Rebuild the round the flags are judged on from a stored row."""
+    if not row:
+        return None
+    return Round(
+        company=row.get("company") or "", company_domain=row.get("domain") or "",
+        stage=row.get("stage") or "", stage_raw=row.get("stage_raw") or "",
+        amount_value=row.get("amount_value"), currency=row.get("currency") or "",
+        region=row.get("region") or "", investors=row.get("investors") or [],
+    )
 
 
 def store_round(db: FundingDatabase, round_: Round, candidate, rules: Rules) -> tuple[str, bool]:
@@ -55,13 +67,16 @@ def store_round(db: FundingDatabase, round_: Round, candidate, rules: Rules) -> 
         db.link_investors(round_id, round_.investors, lead=round_.lead_investor)
 
     # Corroboration and disagreement are properties of the evidence, so they are
-    # judged after the sources are stored, not from the single article in hand.
+    # judged after the sources are stored, not from the single article in hand. The
+    # round is judged the same way: a later, thinner report of a round we already
+    # hold in full must not demote it.
+    merged = round_from_row(db.get_merged_round(round_id) or {}) or round_
     outlets = db.distinct_outlets(round_id)
     disputed = _amounts_disagree(db.round_sources(round_id))
-    verdict = qualifies(round_, rules)
+    verdict = qualifies(merged, rules)
     db.set_round_flags(
         round_id,
-        confirmed=is_confirmed(round_, distinct_outlets=outlets),
+        confirmed=is_confirmed(merged, distinct_outlets=outlets),
         amount_disputed=disputed,
         qualified=verdict.qualified,
         qualified_reason=verdict.reason,
@@ -104,3 +119,27 @@ def run(*, config: dict | None = None, db: FundingDatabase | None = None) -> dic
     finally:
         if own_db:
             db.close()
+
+
+def recheck(db: FundingDatabase, config: dict | None = None) -> dict:
+    """Recompute the flags on stored rounds after a rule or parsing change.
+
+    Nothing is re-extracted and no model is called: this only re-applies the rules
+    to what we already hold, so a change to the brief or to the currency handling
+    does not need a full re-run to show up.
+    """
+    config = config or load_config()
+    rules = Rules.from_config(config)
+    changed = {"rounds": 0, "qualified_changed": 0, "disputed_changed": 0, "confirmed_changed": 0}
+    for row in db.list_rounds(window_days=36500, qualified_only=False):
+        round_ = round_from_row(row)
+        verdict = qualifies(round_, rules)
+        confirmed = is_confirmed(round_, distinct_outlets=db.distinct_outlets(row["round_id"]))
+        disputed = _amounts_disagree(db.round_sources(row["round_id"]))
+        changed["rounds"] += 1
+        changed["qualified_changed"] += int(bool(row["qualified"]) != verdict.qualified)
+        changed["confirmed_changed"] += int(bool(row["confirmed"]) != confirmed)
+        changed["disputed_changed"] += int(bool(row["amount_disputed"]) != disputed)
+        db.set_round_flags(row["round_id"], confirmed=confirmed, amount_disputed=disputed,
+                           qualified=verdict.qualified, qualified_reason=verdict.reason)
+    return changed

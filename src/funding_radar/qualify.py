@@ -18,6 +18,12 @@ from src.funding_radar.models import Round, normalize_company
 APPROX_USD = {"USD": 1.0, "GBP": 1.0, "EUR": 1.0, "CHF": 1.1, "SEK": 0.095, "NOK": 0.09,
               "DKK": 0.14, "PLN": 0.25, "ILS": 0.27}
 
+# Real rates, for comparing two outlets' figures with each other rather than with a
+# floor. Sifted's "£8m" and Dealroom's "$11M" are the same round, and treating the
+# pound as a dollar would report them as a contradiction.
+COMPARISON_USD = {"USD": 1.0, "GBP": 1.34, "EUR": 1.08, "CHF": 1.25, "SEK": 0.105,
+                  "NOK": 0.10, "DKK": 0.145, "PLN": 0.27, "ILS": 0.30}
+
 STAGE_PATTERNS = (
     ("pre-seed", r"\bpre[\s-]?seed\b"),
     ("seed", r"\bseed\b"),
@@ -56,9 +62,17 @@ def looks_like_studio(name: str, summary: str = "") -> bool:
 
 
 def approx_usd(amount: float | None, currency: str) -> float | None:
+    """For the size floor, where $2M, £2M and €2M all count as the bar."""
     if amount is None:
         return None
     return amount * APPROX_USD.get((currency or "USD").upper(), 1.0)
+
+
+def comparable_usd(amount: float | None, currency: str) -> float | None:
+    """For comparing outlets against each other, where the rate has to be real."""
+    if amount is None:
+        return None
+    return amount * COMPARISON_USD.get((currency or "USD").upper(), 1.0)
 
 
 @dataclass

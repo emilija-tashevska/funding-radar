@@ -156,6 +156,23 @@ def region_for(country: str, city: str = "") -> str:
     return ""
 
 
+# Outlets write "£8m" and the model sometimes returns the number without the currency.
+CURRENCY_HINTS = ((("£", "gbp", "pound", "sterling"), "GBP"),
+                  (("€", "eur", "euro"), "EUR"),
+                  (("$", "usd", "dollar"), "USD"),
+                  (("chf", "franc"), "CHF"), (("sek",), "SEK"), (("nok",), "NOK"),
+                  (("dkk",), "DKK"), (("pln", "zloty"), "PLN"), (("ils", "shekel"), "ILS"))
+
+
+def currency_from_text(text: str) -> str:
+    """Read the currency off the text when the model left the field empty."""
+    lowered = (text or "").lower()
+    for needles, code in CURRENCY_HINTS:
+        if any(needle in lowered for needle in needles):
+            return code
+    return ""
+
+
 def rescale_amount(amount: float | None, text: str) -> float | None:
     """Correct an amount written in millions or billions rather than whole units.
 
@@ -185,6 +202,9 @@ def _clean_round(payload: dict, article) -> Round:
     investors = [str(name).strip() for name in payload.get("investors") or [] if str(name).strip()]
     hq = str(payload.get("hq") or "").strip()
     city, _, country = hq.partition(",")
+    # "Germany, Germany": a country given where the city should be.
+    if city.strip().lower() == country.strip().lower():
+        city = ""
     stage = normalize_stage(stage_raw) or normalize_stage(article.title)
     region = str(payload.get("region") or "").strip().lower()
     # "other" is also worth checking: a Helsinki company came back as other when the
@@ -197,7 +217,8 @@ def _clean_round(payload: dict, article) -> Round:
         stage=stage,
         stage_raw=stage_raw,
         amount_value=amount,
-        currency=str(payload.get("currency") or "").strip().upper(),
+        currency=(str(payload.get("currency") or "").strip().upper()
+                  or currency_from_text(f"{evidence} {article.title}")),
         # Boards rarely date the round itself; the article is within days of it.
         round_date=article.published_at,
         investors=investors,

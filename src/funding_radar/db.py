@@ -255,6 +255,26 @@ class FundingDatabase:
         row = self._conn.execute("SELECT * FROM rounds WHERE round_id = ?", (round_id,)).fetchone()
         return dict(row) if row else None
 
+    def get_merged_round(self, round_id: str) -> dict | None:
+        """The round as stored, with its company and investors: what the flags judge.
+
+        The incoming extraction is only the latest report of it, and is often the
+        thinner one.
+        """
+        row = self._conn.execute(
+            """
+            SELECT r.*, c.canonical_name AS company, c.domain, c.region, c.sector
+            FROM rounds r JOIN companies c ON c.company_id = r.company_id
+            WHERE r.round_id = ?
+            """,
+            (round_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        record = dict(row)
+        record["investors"] = [i["name"] for i in self.round_investors(round_id)]
+        return record
+
     def set_round_flags(self, round_id: str, *, confirmed: bool | None = None,
                         amount_disputed: bool | None = None, qualified: bool | None = None,
                         qualified_reason: str | None = None) -> None:

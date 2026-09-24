@@ -160,3 +160,43 @@ def test_rounds_outside_the_brief_keep_the_reason_so_the_site_can_filter(db):
     # It is published with everything else; the site filters, the pipeline does not hide.
     assert [r["company"] for r in db.list_rounds(window_days=120)] == ["Basecamp Research"]
     assert db.list_rounds(window_days=120, qualified_only=True) == []
+
+
+def test_the_same_round_in_pounds_and_dollars_is_not_a_disagreement(db):
+    """Sifted said Magic AI raised £8m; three other outlets said $11M. One round."""
+    first = _candidate(_article("Magic AI raises GBP 8m", "https://sifted.eu/magic", "Sifted"))
+    pipeline.store_round(db, _round(company="Magic AI", amount_value=8_000_000, currency="GBP"), first, RULES)
+    second = _candidate(_article("Magic AI raises $11M", "https://dealroom.test/magic", "Dealroom"))
+    round_id, _ = pipeline.store_round(db, _round(company="Magic AI", amount_value=11_000_000, currency="USD"), second, RULES)
+    assert db.get_round(round_id)["amount_disputed"] == 0
+
+
+def test_a_thinner_second_report_cannot_demote_a_round_we_already_hold(db):
+    """Tech.eu gives the stage and the amount; a later outlet gives neither."""
+    full = _candidate(_article("Acme AI raises $12M Series A", "https://tc.test/a", "TechCrunch"))
+    round_id, _ = pipeline.store_round(db, _round(), full, RULES)
+    assert db.get_round(round_id)["qualified"] == 1
+
+    thin = _candidate(_article("Acme AI closes a round", "https://sifted.eu/a", "Sifted"))
+    pipeline.store_round(db, _round(stage="", stage_raw="", amount_value=None, currency=""), thin, RULES)
+    stored = db.get_round(round_id)
+    assert stored["qualified"] == 1 and stored["confirmed"] == 1
+    assert stored["qualified_reason"] == ""
+
+
+def test_recheck_reapplies_the_rules_without_calling_a_model(db):
+    candidate = _candidate(_article("Acme AI raises $12M Series A", "https://tc.test/a"))
+    round_id, _ = pipeline.store_round(db, _round(region="us"), candidate, RULES)
+    assert db.get_round(round_id)["qualified"] == 0
+
+    wider = Rules(min_amount=RULES.min_amount, stages=RULES.stages,
+                  regions=("uk", "europe", "us"), investor_floors={})
+    changed = pipeline.recheck(db, {"filters": {"min_amount": wider.min_amount,
+                                                "stages": list(wider.stages),
+                                                "regions": list(wider.regions)}})
+    assert changed["qualified_changed"] == 1
+    assert db.get_round(round_id)["qualified"] == 1
+    # Running it again changes nothing: the flags are a function of what is stored.
+    assert pipeline.recheck(db, {"filters": {"min_amount": wider.min_amount,
+                                             "stages": list(wider.stages),
+                                             "regions": list(wider.regions)}})["qualified_changed"] == 0

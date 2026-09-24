@@ -23,6 +23,7 @@ def main() -> None:
     list_p.add_argument("--all", action="store_true", help="Include rounds outside the brief")
 
     sub.add_parser("sources", help="Per-source health from the last run")
+    sub.add_parser("recheck", help="Re-apply the rules to stored rounds (no model calls)")
 
     site_p = sub.add_parser("site", help="Build the static dashboard")
     site_p.add_argument("--days", type=int, default=120)
@@ -64,6 +65,12 @@ def main() -> None:
                   f"{(row['stage'] or '?'):<10} {amount:<17} {row['region']:<7} {row['sector'][:22]:<22} "
                   f"{investors[:34]}{outside}")
         print(f"\n{len(rounds)} round(s)")
+
+    elif args.command == "recheck":
+        from src.funding_radar.pipeline import recheck
+
+        with FundingDatabase(settings.DATABASE_PATH) as db:
+            print(json.dumps(recheck(db), indent=2))
 
     elif args.command == "site":
         from src.funding_radar.site import build

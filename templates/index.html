@@ -61,7 +61,12 @@ blockquote { margin: 8px 0; padding-left: 12px; border-left: 2px solid var(--lin
 .srcs a { color: var(--accent); }
 .empty { text-align: center; color: var(--muted); padding: 48px 0; }
 footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
-@media (max-width: 560px) { .when { margin-left: 0; width: 100%; } }
+@media (max-width: 560px) {
+  .when { margin-left: 0; width: 100%; }
+  /* The filters are three rows deep on a phone; sticking them would eat the screen. */
+  .bar { position: static; }
+  .label { width: auto; }
+}
 </style>
 </head>
 <body>

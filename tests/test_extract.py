@@ -279,3 +279,30 @@ def test_positions_survive_the_retry_across_several_batches(monkeypatch):
     results, _ = extractor.extract(articles, SECTORS, batch_size=2)
     assert isinstance(results[1], Round) and isinstance(results[3], Round)
     assert results[0] == "not a funding round" and results[2] == "not a funding round"
+
+
+def test_a_country_repeated_as_its_own_city_is_not_shown_twice(monkeypatch):
+    monkeypatch.setattr(extractor, "complete_json", _reply({
+        "index": 0, "is_round": True, "company": "mika", "amount_value": 6_000_000,
+        "currency": "EUR", "hq": "Germany, Germany", "region": "europe",
+    }))
+    round_ = extractor.extract_batch([_article("mika raises €6M")], SECTORS)[0]
+    assert (round_.hq_city, round_.hq_country) == ("", "Germany")
+
+
+def test_a_missing_currency_is_read_off_the_headline(monkeypatch):
+    """Sifted's "£8m" came back as a bare number, which then read as dollars."""
+    monkeypatch.setattr(extractor, "complete_json", _reply({
+        "index": 0, "is_round": True, "company": "Magic AI", "amount_value": 8_000_000,
+        "currency": "", "region": "uk", "evidence": "Magic AI raises £8m",
+    }))
+    round_ = extractor.extract_batch([_article("Magic AI raises £8m")], SECTORS)[0]
+    assert round_.currency == "GBP"
+
+
+def test_a_stated_currency_is_never_second_guessed(monkeypatch):
+    monkeypatch.setattr(extractor, "complete_json", _reply({
+        "index": 0, "is_round": True, "company": "Acme", "amount_value": 5_000_000,
+        "currency": "eur", "evidence": "Acme raises $5M in a round led by...",
+    }))
+    assert extractor.extract_batch([_article("Acme raises €5M")], SECTORS)[0].currency == "EUR"
