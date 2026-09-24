@@ -13,7 +13,8 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 from src.funding_radar.models import Article
-from src.funding_radar.sources.base import SourceResult, http_client, strip_html, to_iso
+from src.funding_radar.sources.base import (SourceResult, get_with_agents, http_client,
+                                            strip_html, to_iso)
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,7 @@ def fetch_vc_page(name: str, url: str, *, client=None) -> SourceResult:
     own_client = client is None
     client = client or http_client()
     try:
-        response = client.get(url, timeout=PAGE_TIMEOUT)
-        response.raise_for_status()
+        response = get_with_agents(client, url, timeout=PAGE_TIMEOUT)
         soup = BeautifulSoup(response.text, "lxml")
         host = urlparse(url).netloc
         seen: set[str] = set()

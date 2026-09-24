@@ -8,7 +8,8 @@ import urllib.parse
 import feedparser
 
 from src.funding_radar.models import Article
-from src.funding_radar.sources.base import SourceResult, http_client, strip_html, to_iso
+from src.funding_radar.sources.base import (SourceResult, get_with_agents, http_client,
+                                            strip_html, to_iso)
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +42,10 @@ def _entries_to_articles(entries: list, source: str, kind: str) -> list[Article]
 
 
 def fetch_rss(name: str, url: str, *, client=None) -> SourceResult:
-    """Fetch a feed, then retry through httpx if the feed library is blocked.
+    """Fetch a feed, trying the feed library first and then each agent in turn.
 
-    Publishers block inconsistently: Finsmes serves feedparser but 403s a browser
-    user agent, Silicon Canals does the opposite. Trying both covers each case.
+    Publishers block inconsistently and by IP as well as by agent: Finsmes served
+    this laptop happily and refused GitHub's runners outright.
     """
     try:
         parsed = feedparser.parse(url)
@@ -52,9 +53,7 @@ def fetch_rss(name: str, url: str, *, client=None) -> SourceResult:
             own_client = client is None
             client = client or http_client()
             try:
-                response = client.get(url)
-                response.raise_for_status()
-                parsed = feedparser.parse(response.text)
+                parsed = feedparser.parse(get_with_agents(client, url).text)
             finally:
                 if own_client:
                     client.close()
@@ -64,6 +63,7 @@ def fetch_rss(name: str, url: str, *, client=None) -> SourceResult:
     except Exception as exc:  # noqa: BLE001 - one broken feed must not stop the run
         logger.warning("%s: feed failed: %s", name, exc)
         return SourceResult(name, "rss", [], error=str(exc)[:300])
+
 
 
 def google_news_url(query: str, locale: dict, window: str) -> str:

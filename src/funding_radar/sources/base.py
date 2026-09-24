@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from time import struct_time
+import time
 
 import httpx
 import yaml
@@ -20,6 +21,44 @@ _TAG_RE = re.compile(r"<[^>]+>")
 # publisher itself may contain hyphens.
 _PUBLISHER_SUFFIX_RE = re.compile(r"\s+[-–—|]\s+[\w .&'-]{2,40}$")
 _NOISE_RE = re.compile(r"[^a-z0-9 ]+")
+
+
+# Publishers and CDNs block by user agent and by IP reputation, and they disagree
+# about which agent is acceptable: Finsmes serves a feed reader but refused the
+# browser agent from GitHub's runners, Silicon Canals does the opposite. Trying a
+# short ladder of agents costs one extra request on a source that is already failing.
+FEED_READER_AGENT = "FundingRadar/1.0 (+https://github.com/emilija-tashevska/funding-radar)"
+SIMPLE_AGENT = "Mozilla/5.0 (compatible; FundingRadarBot/1.0)"
+BLOCKED_STATUSES = (403, 406, 429, 503)
+RETRY_PAUSE_SECONDS = 2.0
+
+
+def agents() -> list[str]:
+    return [settings.USER_AGENT, FEED_READER_AGENT, SIMPLE_AGENT]
+
+
+def get_with_agents(client: httpx.Client, url: str, *, timeout: float | None = None):
+    """GET a URL, trying each agent in turn while the answer is a block.
+
+    Raises the last error when every agent is refused, so the source is recorded as
+    failed rather than silently empty.
+    """
+    last: Exception | None = None
+    for index, agent in enumerate(agents()):
+        if index:
+            time.sleep(RETRY_PAUSE_SECONDS)
+        try:
+            headers = {"User-Agent": agent, "Accept": "application/rss+xml, application/xml, text/xml, text/html;q=0.9"}
+            response = client.get(url, headers=headers, **({"timeout": timeout} if timeout else {}))
+            if response.status_code in BLOCKED_STATUSES:
+                last = httpx.HTTPStatusError(f"{response.status_code} for {url}", request=response.request,
+                                             response=response)
+                continue
+            response.raise_for_status()
+            return response
+        except httpx.HTTPError as exc:
+            last = exc
+    raise last if last else RuntimeError(f"no response for {url}")
 
 
 def http_client() -> httpx.Client:

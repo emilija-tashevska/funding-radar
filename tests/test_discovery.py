@@ -161,3 +161,4 @@ def test_vc_funds_raising_their_own_money_are_not_prospects(text):
 def test_operating_companies_are_not_mistaken_for_funds(text):
     assert not discovery.looks_like_fund_raise(text)
     assert discovery.looks_like_funding(text)
+

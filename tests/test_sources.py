@@ -15,7 +15,7 @@ RSS = """<?xml version="1.0"?><rss version="2.0"><channel>
 
 def test_feed_entries_become_articles_with_clean_text(monkeypatch):
     parsed = feedparser.parse(RSS)
-    monkeypatch.setattr(feeds.feedparser, "parse", lambda url: parsed)
+    monkeypatch.setattr(feeds.feedparser, "parse", lambda url, **kwargs: parsed)
     result = feeds.fetch_rss("EU-Startups", "https://example.test/feed")
     assert result.error == ""
     assert len(result.articles) == 1  # the entry without a link is dropped
@@ -26,7 +26,7 @@ def test_feed_entries_become_articles_with_clean_text(monkeypatch):
 
 
 def test_a_broken_feed_is_reported_not_raised(monkeypatch):
-    def boom(url):
+    def boom(url, **kwargs):
         raise OSError("connection reset")
 
     monkeypatch.setattr(feeds.feedparser, "parse", boom)
@@ -150,3 +150,42 @@ def test_valuation_headlines_still_resolve_to_the_company():
     assert company_hint("Tekever nearly quintuples valuation to $6.4B with $580M round") == "tekever"
     assert company_hint("TEKEVER raises $580M Series D at $6.4B valuation") == "tekever"
     assert company_hint("Heidi valuation doubles to $900M on $340M funding round") == "heidi"
+
+
+def test_each_agent_is_tried_before_a_source_is_called_blocked(monkeypatch):
+    """Finsmes served this laptop and refused GitHub's runners with a 403."""
+    import httpx
+
+    from src.funding_radar.sources import base
+
+    monkeypatch.setattr(base.time, "sleep", lambda seconds: None)
+    seen = []
+
+    class Client:
+        def get(self, url, headers=None, **kwargs):
+            agent = (headers or {}).get("User-Agent", "")
+            seen.append(agent)
+            request = httpx.Request("GET", url)
+            status = 403 if len(seen) < 3 else 200
+            return httpx.Response(status, request=request, text="<rss/>")
+
+    response = base.get_with_agents(Client(), "https://finsmes.com/feed")
+    assert response.status_code == 200
+    assert seen == base.agents()  # in order, browser agent first
+
+
+def test_a_source_that_refuses_every_agent_raises(monkeypatch):
+    import httpx
+    import pytest
+
+    from src.funding_radar.sources import base
+
+    monkeypatch.setattr(base.time, "sleep", lambda seconds: None)
+
+    class Client:
+        def get(self, url, headers=None, **kwargs):
+            return httpx.Response(429, request=httpx.Request("GET", url))
+
+    with pytest.raises(httpx.HTTPStatusError):
+        base.get_with_agents(Client(), "https://atomico.com/news")
+

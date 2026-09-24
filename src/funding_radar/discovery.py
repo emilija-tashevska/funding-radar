@@ -141,12 +141,12 @@ def collect(config: dict, *, client=None) -> list:
     own_client = client is None
     client = client or http_client()
     results = []
+    google = config.get("google_news", {})
+    window = google.get("window", "when:3d")
     try:
         for feed in config.get("rss", []):
             results.append(fetch_rss(feed["name"], feed["url"]))
 
-        google = config.get("google_news", {})
-        window = google.get("window", "when:3d")
         for query in google.get("queries", []):
             results.append(fetch_google_news(query, google.get("locale", {}), window))
         for locale in google.get("extra_locales", []):
