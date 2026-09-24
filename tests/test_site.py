@@ -107,3 +107,16 @@ def test_a_publisher_is_named_once_and_direct_links_come_first(db):
     sources = site.build_payload(db, window_days=120)["rounds"][0]["sources"]
     assert [s["outlet"] for s in sources] == ["Finsmes", "Tech.eu"]
     assert all("·" not in s["outlet"] for s in sources)
+
+
+def test_the_artifact_copy_drops_the_skeleton_and_keeps_the_page(tmp_path, db):
+    from src.funding_radar.models import Round
+
+    round_ = Round(company="Acme AI", stage="seed", amount_value=5_000_000, currency="USD",
+                   region="uk", round_date="2026-09-20T00:00:00+00:00")
+    _store(db, round_, _article("Acme AI raises $5M", "https://tc.test/acme"))
+    site.build(out_dir=tmp_path, window_days=120, db=db)
+    hosted = (tmp_path / "artifact.html").read_text()
+    assert "<!doctype html>" not in hosted and "<body>" not in hosted
+    assert "<title>Funding Radar</title>" in hosted and "Acme AI" in hosted
+    assert hosted.count("<script") == 2

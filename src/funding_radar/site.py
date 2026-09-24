@@ -118,4 +118,18 @@ def build(*, out_dir: Path | None = None, window_days: int = 120,
     page.write_text(render(payload), encoding="utf-8")
     # Also on its own, for eyeballing what the page was given.
     (out_dir / "data.json").write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    (out_dir / "artifact.html").write_text(as_artifact(page.read_text(encoding="utf-8")), encoding="utf-8")
     return page
+
+
+# Claude artifacts wrap the file they are given in their own document skeleton, so
+# the hosted copy is the same page with our wrapper taken off.
+SKELETON = ("<!doctype html>", '<html lang="en">', "<head>", "</head>", "<body>",
+            "</body>", "</html>", '<meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1">')
+
+
+def as_artifact(html: str) -> str:
+    """The page without the document skeleton the artifact host supplies itself."""
+    kept = [line for line in html.splitlines() if line.strip() not in SKELETON]
+    return "\n".join(kept).strip() + "\n"
