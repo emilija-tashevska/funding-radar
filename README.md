@@ -74,3 +74,15 @@ python scripts/accuracy_check.py   # live: a few cents, prints a scorecard
 A null label means the headline does not support an answer, so that field is not
 scored. Rows marked `judgement` are reported but excluded from the score: their
 right answer is a preference, not a fact.
+
+## The dashboard
+
+```bash
+python -m src.funding_radar.cli site --open
+```
+
+Builds `site/index.html`: one self-contained page with the rounds inlined, so it
+works from a file path as well as from a web server. Newest first, with filters for
+region, stage, size, confirmed-only, AI-native and venture studios. Rounds outside
+the brief are kept and labelled with the reason, so the "In brief only" toggle
+hides them rather than the pipeline discarding them.

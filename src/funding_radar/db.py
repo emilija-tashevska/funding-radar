@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Iterable
 
 from src.funding_radar.models import Round, normalize_company, normalize_domain
+from src.funding_radar.qualify import looks_like_studio
 
 SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
 # How far apart two reports of the same raise can sit and still be one round.
@@ -44,10 +45,20 @@ class FundingDatabase:
 
     def _migrate(self) -> None:
         """Add columns that CREATE TABLE IF NOT EXISTS will not add to an old file."""
-        for table, column, definition in (("round_sources", "currency", "TEXT DEFAULT ''"),):
+        for table, column, definition in (("round_sources", "currency", "TEXT DEFAULT ''"),
+                                          ("companies", "is_studio", "INTEGER DEFAULT 0")):
             existing = {row["name"] for row in self._conn.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
                 self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+                if (table, column) == ("companies", "is_studio"):
+                    self._backfill_studios()
+
+    def _backfill_studios(self) -> None:
+        rows = self._conn.execute("SELECT company_id, canonical_name, summary FROM companies").fetchall()
+        for row in rows:
+            if looks_like_studio(row["canonical_name"], row["summary"] or ""):
+                self._conn.execute("UPDATE companies SET is_studio = 1 WHERE company_id = ?",
+                                   (row["company_id"],))
 
     def close(self) -> None:
         self._conn.close()
@@ -88,12 +99,13 @@ class FundingDatabase:
             self._conn.execute(
                 """
                 INSERT INTO companies (company_id, canonical_name, name_key, domain, aliases,
-                    summary, hq_city, hq_country, region, sector, ai_native, first_seen_at, last_seen_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    summary, hq_city, hq_country, region, sector, ai_native, is_studio,
+                    first_seen_at, last_seen_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (new_id, round_.company, name_key, domain, json.dumps([name_key]), round_.summary,
                  round_.hq_city, round_.hq_country, round_.region, round_.sector,
-                 int(round_.ai_native), now, now),
+                 int(round_.ai_native), int(looks_like_studio(round_.company, round_.summary)), now, now),
             )
             self._conn.commit()
             return new_id
@@ -116,11 +128,13 @@ class FundingDatabase:
                 region = COALESCE(NULLIF(?, ''), region),
                 sector = COALESCE(NULLIF(?, ''), sector),
                 ai_native = MAX(ai_native, ?),
+                is_studio = MAX(is_studio, ?),
                 last_seen_at = ?
             WHERE company_id = ?
             """,
             (round_.company, domain, json.dumps(sorted(aliases)), round_.summary, round_.hq_city,
-             round_.hq_country, round_.region, round_.sector, int(round_.ai_native), now, company_id),
+             round_.hq_country, round_.region, round_.sector, int(round_.ai_native),
+             int(looks_like_studio(round_.company, round_.summary)), now, company_id),
         )
         self._conn.commit()
         return company_id
@@ -392,7 +406,7 @@ class FundingDatabase:
         rows = self._conn.execute(
             f"""
             SELECT r.*, c.canonical_name AS company, c.domain, c.summary AS company_summary,
-                   c.hq_city, c.hq_country, c.region, c.sector, c.ai_native,
+                   c.hq_city, c.hq_country, c.region, c.sector, c.ai_native, c.is_studio,
                    s.fit_score, s.angle, s.reason AS fit_reason, f.verdict AS feedback
             FROM rounds r
             JOIN companies c ON c.company_id = r.company_id

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Funding Radar</title>
+<style>
+:root {
+  --bg: #f6f6f4; --panel: #fff; --ink: #14140f; --muted: #6b6b60; --line: #e2e2dc;
+  --accent: #b44c1f; --accent-soft: #fbeee7; --good: #2f6f4f; --warn: #8a6d1f;
+  --chip: #efefea; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14140f; --panel: #1c1c17; --ink: #f2f2ec; --muted: #9b9b8f; --line: #2e2e26;
+    --accent: #e8825a; --accent-soft: #2a1d16; --good: #6fbf93; --warn: #d6b35c;
+    --chip: #25251e; --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; }
+.wrap { max-width: 1060px; margin: 0 auto; padding: 28px 16px 80px; }
+header h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.02em; }
+header p { margin: 0; color: var(--muted); font-size: 13px; }
+.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 16px 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row + .row { margin-top: 8px; }
+input[type=search], select {
+  font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 10px; min-width: 0;
+}
+input[type=search] { flex: 1 1 220px; }
+.chip {
+  font: inherit; font-size: 13px; cursor: pointer; border: 1px solid var(--line);
+  background: var(--chip); color: var(--ink); border-radius: 999px; padding: 5px 11px;
+}
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.group { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.label { width: 54px; flex: 0 0 auto; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 2px; }
+.count { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.card.out { opacity: .72; }
+.head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.name { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.name a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
+.amount { font-size: 18px; font-weight: 600; color: var(--accent); }
+.stage { color: var(--muted); }
+.when { margin-left: auto; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.summary { margin: 8px 0 0; }
+.meta { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.meta b { color: var(--ink); font-weight: 500; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+.badge.ok { background: var(--accent-soft); color: var(--good); }
+.badge.warn { color: var(--warn); }
+.badge.out { color: var(--accent); background: var(--accent-soft); }
+details { margin-top: 10px; }
+summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+blockquote { margin: 8px 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--muted); font-size: 14px; }
+.srcs { list-style: none; padding: 0; margin: 6px 0 0; font-size: 13px; }
+.srcs a { color: var(--accent); }
+.empty { text-align: center; color: var(--muted); padding: 48px 0; }
+footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+@media (max-width: 560px) { .when { margin-left: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Funding Radar</h1>
+    <p id="subtitle"></p>
+  </header>
+
+  <div class="bar">
+    <div class="row">
+      <input type="search" id="q" placeholder="Search company, investor, sector…" autocomplete="off">
+      <select id="sort">
+        <option value="date">Newest first</option>
+        <option value="amount">Largest first</option>
+      </select>
+    </div>
+    <div class="row">
+      <span class="label">Region</span><span id="regions" class="group"></span>
+    </div>
+    <div class="row">
+      <span class="label">Stage</span><span id="stages" class="group"></span>
+    </div>
+    <div class="row">
+      <span class="label">Show</span>
+      <button class="chip" id="f-brief" aria-pressed="true">In brief only</button>
+      <button class="chip" id="f-confirmed" aria-pressed="false">Confirmed only</button>
+      <button class="chip" id="f-ai" aria-pressed="false">AI-native</button>
+      <button class="chip" id="f-studio" aria-pressed="false">Hide studios</button>
+      <select id="minamt">
+        <option value="0">Any size</option>
+        <option value="1000000">1M+</option>
+        <option value="2000000">2M+</option>
+        <option value="5000000">5M+</option>
+        <option value="10000000">10M+</option>
+        <option value="25000000">25M+</option>
+      </select>
+    </div>
+  </div>
+
+  <p class="count" id="count"></p>
+  <div id="list"></div>
+  <footer id="footer"></footer>
+</div>
+
+<script id="payload" type="application/json">__DATA__</script>
+<script>
+const DATA = JSON.parse(document.getElementById('payload').textContent);
+const ROUNDS = DATA.rounds;
+const SYM = { USD: '$', GBP: '£', EUR: '€', CHF: 'CHF ', SEK: 'SEK ', NOK: 'NOK ', DKK: 'DKK ', PLN: 'PLN ' };
+const REGION_LABEL = { uk: 'UK', europe: 'Europe', us: 'US', other: 'Other' };
+const state = { q: '', sort: 'date', regions: new Set(), stages: new Set(),
+                brief: true, confirmed: false, ai: false, hideStudios: false, minAmount: 0 };
+
+function money(r) {
+  if (!r.amount) return 'undisclosed';
+  const sym = SYM[r.currency] || (r.currency ? r.currency + ' ' : '');
+  const n = r.amount >= 1e9 ? (r.amount / 1e9).toFixed(1).replace(/\.0$/, '') + 'B'
+          : r.amount >= 1e6 ? (r.amount / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
+          : (r.amount / 1e3).toFixed(0) + 'K';
+  return sym + n;
+}
+function when(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), days = Math.floor((Date.now() - d) / 86400000);
+  const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  if (days <= 0) return 'today · ' + label;
+  if (days === 1) return 'yesterday · ' + label;
+  if (days < 30) return days + ' days ago · ' + label;
+  return label + ' ' + d.getFullYear();
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function toggles(host, values, key, labels) {
+  host.innerHTML = '';
+  values.forEach(value => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.type = 'button'; b.setAttribute('aria-pressed', 'false');
+    b.textContent = labels ? (labels[value] || value) : value;
+    b.onclick = () => {
+      const on = b.getAttribute('aria-pressed') === 'true';
+      b.setAttribute('aria-pressed', String(!on));
+      on ? state[key].delete(value) : state[key].add(value);
+      render();
+    };
+    host.appendChild(b);
+  });
+}
+
+function matches(r) {
+  if (state.brief && !r.qualified) return false;
+  if (state.confirmed && !r.confirmed) return false;
+  if (state.ai && !r.ai_native) return false;
+  if (state.hideStudios && r.is_studio) return false;
+  if (state.minAmount && !(r.amount_usd >= state.minAmount)) return false;
+  if (state.regions.size && !state.regions.has(r.region || 'other')) return false;
+  if (state.stages.size && !state.stages.has(r.stage || 'unstated')) return false;
+  if (state.q) {
+    const hay = [r.company, r.summary, r.sector, r.hq, (r.investors || []).join(' '),
+                 (r.sources || []).map(s => s.outlet).join(' ')].join(' ').toLowerCase();
+    if (!state.q.split(/\s+/).every(term => hay.includes(term))) return false;
+  }
+  return true;
+}
+
+function card(r) {
+  const badges = [];
+  if (r.confirmed) badges.push('<span class="badge ok">confirmed</span>');
+  else badges.push('<span class="badge">unconfirmed</span>');
+  if (r.ai_native) badges.push('<span class="badge">AI-native</span>');
+  if (r.is_studio) badges.push('<span class="badge">venture studio</span>');
+  if (r.disputed) badges.push('<span class="badge warn">outlets disagree on the amount</span>');
+  if (!r.qualified && r.qualified_reason) badges.push(`<span class="badge out">${esc(r.qualified_reason)}</span>`);
+  const name = r.domain ? `<a href="https://${esc(r.domain)}" target="_blank" rel="noopener">${esc(r.company)}</a>` : esc(r.company);
+  const facts = [r.sector, r.hq || REGION_LABEL[r.region] || r.region].filter(Boolean).map(esc).join(' · ');
+  const investors = (r.investors || []).length ? `<div class="meta">Investors: <b>${r.investors.map(esc).join(', ')}</b></div>` : '';
+  const sources = (r.sources || []).map(s =>
+    `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.outlet || 'source')}</a> — ${esc(s.title)}</li>`).join('');
+  return `<article class="card${r.qualified ? '' : ' out'}">
+    <div class="head">
+      <span class="name">${name}</span>
+      <span class="amount">${money(r)}</span>
+      <span class="stage">${esc(r.stage || 'stage unstated')}</span>
+      <span class="when">${esc(when(r.date))}</span>
+    </div>
+    ${r.summary ? `<p class="summary">${esc(r.summary)}</p>` : ''}
+    ${facts ? `<div class="meta">${facts}</div>` : ''}
+    ${investors}
+    <div class="badges">${badges.join('')}</div>
+    <details>
+      <summary>${(r.sources || []).length} source${(r.sources || []).length === 1 ? '' : 's'}</summary>
+      ${r.evidence ? `<blockquote>${esc(r.evidence)}</blockquote>` : ''}
+      <ul class="srcs">${sources}</ul>
+    </details>
+  </article>`;
+}
+
+function render() {
+  const rows = ROUNDS.filter(matches).sort((a, b) => state.sort === 'amount'
+    ? (b.amount_usd || 0) - (a.amount_usd || 0)
+    : String(b.date || '').localeCompare(String(a.date || '')));
+  document.getElementById('list').innerHTML = rows.length
+    ? rows.map(card).join('')
+    : '<p class="empty">Nothing matches these filters.</p>';
+  document.getElementById('count').textContent =
+    `${rows.length} of ${ROUNDS.length} round${ROUNDS.length === 1 ? '' : 's'}`;
+}
+
+document.getElementById('subtitle').textContent =
+  `${DATA.meta.window_days}-day window · ${DATA.meta.total} rounds · ${DATA.meta.qualified} in brief · built ${when(DATA.meta.generated_at)}`;
+document.getElementById('footer').textContent =
+  `Sources: ${DATA.meta.outlets} outlets. Amounts are as reported by the outlet; size filters use a rough USD equivalent.`;
+toggles(document.getElementById('regions'), DATA.meta.regions, 'regions', REGION_LABEL);
+toggles(document.getElementById('stages'), DATA.meta.stages, 'stages');
+document.getElementById('q').oninput = e => { state.q = e.target.value.trim().toLowerCase(); render(); };
+document.getElementById('sort').onchange = e => { state.sort = e.target.value; render(); };
+document.getElementById('minamt').onchange = e => { state.minAmount = Number(e.target.value); render(); };
+[['f-brief', 'brief'], ['f-confirmed', 'confirmed'], ['f-ai', 'ai'], ['f-studio', 'hideStudios']].forEach(([id, key]) => {
+  const b = document.getElementById(id);
+  b.onclick = () => { state[key] = !state[key]; b.setAttribute('aria-pressed', String(state[key])); render(); };
+});
+render();
+</script>
+</body>
+</html>

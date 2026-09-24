@@ -211,3 +211,14 @@ def test_deleting_a_company_takes_its_rounds_and_evidence_with_it(db):
     db._conn.commit()
     assert db.get_round(round_id) is None
     assert db.round_sources(round_id) == []
+
+
+def test_a_studio_company_carries_its_flag_into_the_round_list(db):
+    from src.funding_radar.models import Round
+
+    db.upsert_company(Round(company="OWOW Venture Studio", summary="Builds B2B startups", region="europe"))
+    round_ = Round(company="OWOW Venture Studio", summary="Builds B2B startups", region="europe",
+                   amount_value=2_650_000, currency="EUR", round_date="2026-09-24T00:00:00+00:00")
+    company_id = db.upsert_company(round_)
+    db.upsert_round(round_, company_id)
+    assert db.list_rounds(window_days=120)[0]["is_studio"] == 1

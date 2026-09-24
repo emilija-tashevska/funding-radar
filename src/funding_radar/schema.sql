@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS companies (
     region       TEXT DEFAULT '',           -- uk | europe | us | other
     sector       TEXT DEFAULT '',
     ai_native    INTEGER DEFAULT 0,
+    is_studio    INTEGER DEFAULT 0,         -- venture studio / company builder
     first_seen_at TEXT NOT NULL,
     last_seen_at  TEXT
 );

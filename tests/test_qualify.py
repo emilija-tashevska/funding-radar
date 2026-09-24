@@ -97,3 +97,19 @@ def test_a_round_with_no_stage_named_still_qualifies_on_size():
     unnamed = _round(stage="", stage_raw="")
     assert qualifies(unnamed, RULES).qualified
     assert not is_confirmed(unnamed)
+
+
+def test_a_venture_studio_is_flagged_not_dropped():
+    from src.funding_radar.qualify import looks_like_studio
+
+    assert looks_like_studio("OWOW Venture Studio", "Builds B2B startups for traditional industries")
+    assert looks_like_studio("Foundry", "A company builder spinning out deep tech ventures")
+    assert looks_like_studio("Unnamed", "A startup that builds other startups")
+
+
+def test_ordinary_companies_are_not_mistaken_for_studios():
+    from src.funding_radar.qualify import looks_like_studio
+
+    assert not looks_like_studio("Metris Energy", "AI platform for renewable energy assets")
+    assert not looks_like_studio("Pitch Black", "A game studio making multiplayer titles")
+    assert not looks_like_studio("Form", "A design studio for consumer brands")

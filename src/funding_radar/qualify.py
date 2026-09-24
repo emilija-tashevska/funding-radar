@@ -40,6 +40,21 @@ def normalize_stage(text: str) -> str:
     return ""
 
 
+# A studio raises money to build other companies, so it is a real round but a
+# different kind of prospect. Flagged rather than dropped, for the site's filter.
+STUDIO_RE = re.compile(
+    r"\b(venture|startup|start-up|company|venture-)?\s?(studio|builder)\b|"
+    r"\bventure building\b|\bcompany builder\b|\bbuilds? (other )?(startups|companies)\b", re.I)
+
+
+def looks_like_studio(name: str, summary: str = "") -> bool:
+    text = f"{name} {summary}"
+    if not STUDIO_RE.search(text):
+        return False
+    # "game studio", "design studio" and the like are ordinary companies.
+    return not re.search(r"\b(game|games|gaming|design|film|music|animation|yoga|pilates|photo|recording)\s+studio\b", text, re.I)
+
+
 def approx_usd(amount: float | None, currency: str) -> float | None:
     if amount is None:
         return None

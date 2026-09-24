@@ -7,10 +7,12 @@ secondaries, and valuation stories all read like funding rounds in a headline.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import re
 
+from src.funding_radar.fulltext import fetch_article_text
 from src.funding_radar.llm import LLMError, complete_json
 from src.funding_radar.models import Round
 from src.funding_radar.qualify import normalize_stage
@@ -19,6 +21,8 @@ from src.funding_radar.settings import settings
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 8
+# A round we could not attribute: worth one article fetch before dropping it.
+NO_COMPANY = "no company named"
 RUBRIC_VERSION = "extract-v1"
 
 SYSTEM_PROMPT = """You read startup funding news and return structured facts. You are
@@ -236,7 +240,7 @@ def extract_batch(candidates: list, sectors: list[str], *, model: str | None = N
             continue
         round_ = _clean_round(item, article)
         if not round_.company:
-            results[index] = "no company named"
+            results[index] = NO_COMPANY
             continue
         # A sector outside the supplied list would break the site's filters.
         if round_.sector not in sectors:
@@ -248,10 +252,47 @@ def extract_batch(candidates: list, sectors: list[str], *, model: str | None = N
     return results
 
 
+def retry_unnamed(candidates: list, results: dict[int, Round | str], sectors: list[str],
+                  *, offset: int = 0) -> int:
+    """Re-read the articles whose headline named no company, this time with the body.
+
+    Returns how many were rescued. The body is only fetched for these few, so the
+    common case still costs one model call per batch and no page loads at all.
+    """
+    unnamed = [index for index, result in results.items()
+               if isinstance(result, str) and result == NO_COMPANY]
+    if not unnamed:
+        return 0
+    enriched, positions = [], []
+    for index in unnamed:
+        candidate = candidates[index - offset]
+        article = candidate.article if hasattr(candidate, "article") else candidate
+        body = fetch_article_text(article.url)
+        if not body:
+            continue
+        enriched.append(dataclasses.replace(article, summary=f"{article.summary or ''} {body}".strip()))
+        positions.append(index)
+    if not enriched:
+        return 0
+    logger.info("Re-reading %d article(s) whose headline named no company", len(enriched))
+    try:
+        retried = extract_batch(enriched, sectors)
+    except LLMError as exc:
+        logger.warning("Retry of unnamed rounds failed: %s", exc)
+        return 0
+    rescued = 0
+    for position, result in retried.items():
+        if isinstance(result, Round):
+            results[positions[position]] = result
+            rescued += 1
+    return rescued
+
+
 def extract(candidates: list, sectors: list[str], *, batch_size: int = BATCH_SIZE,
             max_calls: int | None = None) -> tuple[dict[int, Round | str], dict]:
     """Extract every candidate, in batches, tolerating a failed batch."""
-    stats = {"batches": 0, "failed_batches": 0, "rounds": 0, "rejected": 0, "skipped_over_cap": 0}
+    stats = {"batches": 0, "failed_batches": 0, "rounds": 0, "rejected": 0,
+             "rescued_unnamed": 0, "skipped_over_cap": 0}
     results: dict[int, Round | str] = {}
     cap = settings.MAX_EXTRACTIONS_PER_RUN if max_calls is None else max_calls
     allowed = candidates[:cap]
@@ -270,8 +311,10 @@ def extract(candidates: list, sectors: list[str], *, batch_size: int = BATCH_SIZ
             logger.warning("Extraction batch failed: %s", exc)
             stats["failed_batches"] += 1
             continue
-        for offset, result in batch_results.items():
-            results[start + offset] = result
+        batch_results = {start + index: result for index, result in batch_results.items()}
+        stats["rescued_unnamed"] += retry_unnamed(batch, batch_results, sectors, offset=start)
+        for index, result in batch_results.items():
+            results[index] = result
             if isinstance(result, Round):
                 stats["rounds"] += 1
             else:

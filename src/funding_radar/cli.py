@@ -24,6 +24,11 @@ def main() -> None:
 
     sub.add_parser("sources", help="Per-source health from the last run")
 
+    site_p = sub.add_parser("site", help="Build the static dashboard")
+    site_p.add_argument("--days", type=int, default=120)
+    site_p.add_argument("--out", default=None, help="Output directory (default: site/)")
+    site_p.add_argument("--open", action="store_true", help="Open it in a browser when built")
+
     args = parser.parse_args()
     logging.basicConfig(
         level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
@@ -59,6 +64,16 @@ def main() -> None:
                   f"{(row['stage'] or '?'):<10} {amount:<17} {row['region']:<7} {row['sector'][:22]:<22} "
                   f"{investors[:34]}{outside}")
         print(f"\n{len(rounds)} round(s)")
+
+    elif args.command == "site":
+        from src.funding_radar.site import build
+
+        page = build(out_dir=args.out, window_days=args.days)
+        print(f"Built {page}")
+        if args.open:
+            import webbrowser
+
+            webbrowser.open(page.as_uri())
 
     elif args.command == "sources":
         with FundingDatabase(settings.DATABASE_PATH) as db:

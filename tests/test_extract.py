@@ -227,3 +227,55 @@ def test_a_stated_region_outside_europe_is_respected(monkeypatch):
         "region": "us", "amount_value": 25_000_000, "currency": "USD",
     }))
     assert extractor.extract_batch([_article("Corridor raises $25M seed")], SECTORS)[0].region == "us"
+
+
+def test_a_round_whose_headline_names_no_company_is_retried_with_the_article_body(monkeypatch):
+    """"A startup that builds other startups raised $100M" is a real round: read on."""
+    calls = []
+
+    def fake_extract_batch(batch, sectors, **kwargs):
+        calls.append([a.summary for a in batch])
+        if len(calls) == 1:
+            return {0: extractor.NO_COMPANY}
+        return {0: Round(company="UP.Labs", amount_value=100_000_000, currency="USD")}
+
+    monkeypatch.setattr(extractor, "extract_batch", fake_extract_batch)
+    monkeypatch.setattr(extractor, "fetch_article_text", lambda url: "UP.Labs, a venture studio, raised $100M.")
+    article = _article("A startup that builds other startups raised $100M")
+    results, stats = extractor.extract([article], SECTORS)
+    assert isinstance(results[0], Round) and results[0].company == "UP.Labs"
+    assert stats["rescued_unnamed"] == 1 and stats["rounds"] == 1
+    # The second call saw the body; the first only had the headline.
+    assert "venture studio" in calls[1][0] and "venture studio" not in calls[0][0]
+
+
+def test_an_unreadable_article_leaves_the_rejection_alone(monkeypatch):
+    monkeypatch.setattr(extractor, "extract_batch", lambda batch, sectors, **kw: {0: extractor.NO_COMPANY})
+    monkeypatch.setattr(extractor, "fetch_article_text", lambda url: "")
+    results, stats = extractor.extract([_article("Someone raised $100M")], SECTORS)
+    assert results[0] == extractor.NO_COMPANY and stats["rescued_unnamed"] == 0
+
+
+def test_the_retry_only_pays_for_the_articles_that_need_it(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(extractor, "fetch_article_text", lambda url: fetched.append(url) or "")
+    monkeypatch.setattr(extractor, "extract_batch", lambda batch, sectors, **kw: {
+        0: Round(company="Acme"), 1: "not a funding round"})
+    extractor.extract([_article("Acme raises $4M"), _article("Weekly round-up")], SECTORS)
+    assert fetched == []
+
+
+def test_positions_survive_the_retry_across_several_batches(monkeypatch):
+    """The rescued round must land on its own article, not on the first of the batch."""
+    def fake_extract_batch(batch, sectors, **kwargs):
+        if len(batch) == 1 and batch[0].summary.startswith("Body"):
+            return {0: Round(company="Rescued")}
+        return {index: extractor.NO_COMPANY if index == 1 else "not a funding round"
+                for index in range(len(batch))}
+
+    monkeypatch.setattr(extractor, "extract_batch", fake_extract_batch)
+    monkeypatch.setattr(extractor, "fetch_article_text", lambda url: "Body of the article")
+    articles = [_article(f"Headline {n}") for n in range(4)]
+    results, _ = extractor.extract(articles, SECTORS, batch_size=2)
+    assert isinstance(results[1], Round) and isinstance(results[3], Round)
+    assert results[0] == "not a funding round" and results[2] == "not a funding round"
