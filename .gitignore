@@ -6,3 +6,4 @@ data/
 site/
 .pytest_cache/
 .DS_Store
+.claude/
