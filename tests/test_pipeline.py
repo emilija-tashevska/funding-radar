@@ -86,12 +86,31 @@ def test_small_disagreements_are_not_flagged(db):
     assert db.get_round(round_id)["amount_disputed"] == 0
 
 
-def test_an_out_of_scope_round_is_stored_but_not_qualified(db):
+def test_the_same_round_in_two_currencies_is_not_a_disagreement(db):
+    """50skills was reported as €5.3M and as $6M: one round, two outlets, no dispute."""
+    first = _candidate(_article("50skills raises EUR 5.3 million", "https://eu.test/a", "EU-Startups"))
+    pipeline.store_round(db, _round(amount_value=5_300_000, currency="EUR"), first, RULES)
+    second = _candidate(_article("50skills raises $6M", "https://tech.eu/a", "Tech.eu"))
+    round_id, created = pipeline.store_round(db, _round(amount_value=6_000_000, currency="USD"), second, RULES)
+    assert not created
+    assert db.get_round(round_id)["amount_disputed"] == 0
+    assert {s["currency"] for s in db.round_sources(round_id)} == {"EUR", "USD"}
+
+
+def test_a_real_disagreement_survives_the_currency_conversion(db):
+    first = _candidate(_article("Acme AI raises GBP 3M", "https://tc.test/a", "TechCrunch"))
+    pipeline.store_round(db, _round(amount_value=3_000_000, currency="GBP"), first, RULES)
+    second = _candidate(_article("Acme AI raises $12M", "https://sifted.eu/a", "Sifted"))
+    round_id, _ = pipeline.store_round(db, _round(amount_value=12_000_000, currency="USD"), second, RULES)
+    assert db.get_round(round_id)["amount_disputed"] == 1
+
+
+def test_an_out_of_scope_round_is_stored_and_marked_rather_than_dropped(db):
     candidate = _candidate(_article("Acme AI raises $12M Series A", "https://tc.test/a"))
     round_id, _ = pipeline.store_round(db, _round(region="us"), candidate, RULES)
-    assert db.get_round(round_id)["qualified"] == 0
-    assert db.list_rounds(window_days=120) == []
-    assert len(db.list_rounds(window_days=120, qualified_only=False)) == 1
+    stored = db.get_round(round_id)
+    assert stored["qualified"] == 0 and "region us" in stored["qualified_reason"]
+    assert len(db.list_rounds(window_days=120)) == 1
 
 
 def test_an_antler_company_qualifies_below_the_usual_floor(db):
@@ -128,3 +147,16 @@ def test_a_run_stores_rounds_and_marks_rejected_articles(db, monkeypatch):
     assert [r["company"] for r in db.list_rounds(window_days=120)] == ["Acme AI"]
     # The rejected article is remembered so it is never paid for twice.
     assert db.is_article_seen(bad.article.article_id, "connect ventures raises 55m fund")
+
+
+def test_rounds_outside_the_brief_keep_the_reason_so_the_site_can_filter(db):
+    candidate = _candidate(_article("Basecamp Research raises $140M Series C", "https://tc.test/b"))
+    round_id, _ = pipeline.store_round(
+        db, _round(company="Basecamp Research", company_domain="basecamp.bio", stage="series c",
+                   amount_value=140_000_000), candidate, RULES)
+    stored = db.get_round(round_id)
+    assert stored["qualified"] == 0
+    assert "series c" in stored["qualified_reason"]
+    # It is published with everything else; the site filters, the pipeline does not hide.
+    assert [r["company"] for r in db.list_rounds(window_days=120)] == ["Basecamp Research"]
+    assert db.list_rounds(window_days=120, qualified_only=True) == []

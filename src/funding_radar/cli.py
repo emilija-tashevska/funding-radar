@@ -20,7 +20,7 @@ def main() -> None:
 
     list_p = sub.add_parser("rounds", help="Print stored rounds")
     list_p.add_argument("--days", type=int, default=120)
-    list_p.add_argument("--all", action="store_true", help="Include rounds that did not qualify")
+    list_p.add_argument("--all", action="store_true", help="Include rounds outside the brief")
 
     sub.add_parser("sources", help="Per-source health from the last run")
 
@@ -54,8 +54,10 @@ def main() -> None:
             amount = f"{row['currency']} {row['amount_value']:,.0f}" if row["amount_value"] else "undisclosed"
             flags = "".join(["✓" if row["confirmed"] else "·", "!" if row["amount_disputed"] else " "])
             investors = ", ".join(row["investors"][:3])
-            print(f"{flags} {(row['announced_date'] or '')[:10]}  {row['company'][:28]:<28} "
-                  f"{(row['stage'] or '?'):<10} {amount:<18} {row['region']:<7} {row['sector'][:24]:<24} {investors[:40]}")
+            outside = "" if row["qualified"] else f"  ← outside brief: {row['qualified_reason']}"
+            print(f"{flags} {(row['announced_date'] or '')[:10]}  {row['company'][:26]:<26} "
+                  f"{(row['stage'] or '?'):<10} {amount:<17} {row['region']:<7} {row['sector'][:22]:<22} "
+                  f"{investors[:34]}{outside}")
         print(f"\n{len(rounds)} round(s)")
 
     elif args.command == "sources":

@@ -162,11 +162,12 @@ def test_a_round_reads_back_with_company_score_investors_and_sources(db):
     assert len(row["sources"]) == 1
 
 
-def test_unqualified_rounds_are_kept_but_not_published(db):
+def test_out_of_brief_rounds_are_listed_by_default_and_filterable(db):
+    """The site filters; the pipeline does not hide. Late-stage and US rounds stay visible."""
     company_id = db.upsert_company(_round())
     db.upsert_round(_round(qualified=False), company_id)
-    assert db.list_rounds(window_days=120) == []
-    assert len(db.list_rounds(window_days=120, qualified_only=False)) == 1
+    assert len(db.list_rounds(window_days=120)) == 1
+    assert db.list_rounds(window_days=120, qualified_only=True) == []
 
 
 def test_the_digest_takes_the_best_confirmed_rounds_once(db):

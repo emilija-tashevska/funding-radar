@@ -59,3 +59,18 @@ pytest -m live           # hits the real sources
 
 Configuration lives in [`config/sources.yaml`](config/sources.yaml): sources, filters,
 the fund list, and the fixed sector list the model assigns from.
+
+## Accuracy
+
+`tests/fixtures/labelled_articles.json` holds 20 real articles labelled by hand from
+the article text (not from model output), including debt, valuation stories, list
+articles and one round reported twice in two currencies.
+
+```bash
+pytest tests/test_accuracy.py      # offline: the set and the scorer itself
+python scripts/accuracy_check.py   # live: a few cents, prints a scorecard
+```
+
+A null label means the headline does not support an answer, so that field is not
+scored. Rows marked `judgement` are reported but excluded from the score: their
+right answer is a preference, not a fact.

@@ -39,7 +39,15 @@ class FundingDatabase:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns that CREATE TABLE IF NOT EXISTS will not add to an old file."""
+        for table, column, definition in (("round_sources", "currency", "TEXT DEFAULT ''"),):
+            existing = {row["name"] for row in self._conn.execute(f"PRAGMA table_info({table})")}
+            if column not in existing:
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def close(self) -> None:
         self._conn.close()
@@ -234,12 +242,16 @@ class FundingDatabase:
         return dict(row) if row else None
 
     def set_round_flags(self, round_id: str, *, confirmed: bool | None = None,
-                        amount_disputed: bool | None = None, qualified: bool | None = None) -> None:
+                        amount_disputed: bool | None = None, qualified: bool | None = None,
+                        qualified_reason: str | None = None) -> None:
         sets, values = [], []
         for column, value in (("confirmed", confirmed), ("amount_disputed", amount_disputed), ("qualified", qualified)):
             if value is not None:
                 sets.append(f"{column} = ?")
                 values.append(int(value))
+        if qualified_reason is not None:
+            sets.append("qualified_reason = ?")
+            values.append(qualified_reason)
         if not sets:
             return
         values.append(round_id)
@@ -298,15 +310,17 @@ class FundingDatabase:
 
     # ---- sources and articles ------------------------------------------
 
-    def add_round_source(self, round_id: str, article, amount_value: float | None = None) -> None:
+    def add_round_source(self, round_id: str, article, amount_value: float | None = None,
+                         currency: str = "") -> None:
         self._conn.execute(
             """
             INSERT OR REPLACE INTO round_sources
-                (round_id, article_url, outlet, source_kind, title, published_at, amount_value, seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (round_id, article_url, outlet, source_kind, title, published_at,
+                 amount_value, currency, seen_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (round_id, article.url, article.source, article.source_kind, article.title,
-             article.published_at, amount_value, _now()),
+             article.published_at, amount_value, (currency or "").upper(), _now()),
         )
         self._conn.commit()
 
@@ -372,7 +386,7 @@ class FundingDatabase:
 
     # ---- reading --------------------------------------------------------
 
-    def list_rounds(self, *, window_days: int, qualified_only: bool = True) -> list[dict]:
+    def list_rounds(self, *, window_days: int, qualified_only: bool = False) -> list[dict]:
         """Rounds for the site: company, round, latest score and investors in one row."""
         cutoff = (datetime.now(timezone.utc) - timedelta(days=window_days)).isoformat()
         rows = self._conn.execute(

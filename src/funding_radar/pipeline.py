@@ -14,7 +14,7 @@ from src.funding_radar.db import FundingDatabase
 from src.funding_radar.discovery import discover
 from src.funding_radar.extract import extract
 from src.funding_radar.models import Round
-from src.funding_radar.qualify import Rules, is_confirmed, qualifies
+from src.funding_radar.qualify import Rules, approx_usd, is_confirmed, qualifies
 from src.funding_radar.settings import settings
 from src.funding_radar.sources.base import company_hint, headline_key, load_config
 
@@ -33,8 +33,10 @@ def register_tracked_investors(db: FundingDatabase, config: dict) -> None:
         db.upsert_investor(page["name"], tracked=True)
 
 
-def _amounts_disagree(amounts: list[float]) -> bool:
-    values = [a for a in amounts if a]
+def _amounts_disagree(sources: list[dict]) -> bool:
+    """Outlets convert currencies, so compare in one of them before crying foul."""
+    values = [usd for usd in (approx_usd(s.get("amount_value"), s.get("currency") or "USD")
+                              for s in sources) if usd]
     if len(values) < 2:
         return False
     return (max(values) - min(values)) / max(values) > AMOUNT_DISAGREEMENT
@@ -46,7 +48,7 @@ def store_round(db: FundingDatabase, round_: Round, candidate, rules: Rules) -> 
     round_id, created = db.upsert_round(round_, company_id)
 
     for article in candidate.articles:
-        db.add_round_source(round_id, article, round_.amount_value)
+        db.add_round_source(round_id, article, round_.amount_value, round_.currency)
         db.record_article(article, headline_key(article.title), outcome="extracted",
                           company_hint=company_hint(article.title), round_id=round_id)
     if round_.investors:
@@ -55,13 +57,14 @@ def store_round(db: FundingDatabase, round_: Round, candidate, rules: Rules) -> 
     # Corroboration and disagreement are properties of the evidence, so they are
     # judged after the sources are stored, not from the single article in hand.
     outlets = db.distinct_outlets(round_id)
-    disputed = _amounts_disagree([s["amount_value"] for s in db.round_sources(round_id)])
+    disputed = _amounts_disagree(db.round_sources(round_id))
     verdict = qualifies(round_, rules)
     db.set_round_flags(
         round_id,
         confirmed=is_confirmed(round_, distinct_outlets=outlets),
         amount_disputed=disputed,
         qualified=verdict.qualified,
+        qualified_reason=verdict.reason,
     )
     return round_id, created
 

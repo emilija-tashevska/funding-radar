@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS rounds (
     confidence   REAL DEFAULT 0,
     confirmed    INTEGER DEFAULT 0,
     amount_disputed INTEGER DEFAULT 0,
-    qualified    INTEGER DEFAULT 0,         -- passed stage/size/region rules
+    qualified    INTEGER DEFAULT 0,         -- inside the brief (stage/size/region)
+    qualified_reason TEXT DEFAULT '',       -- why not, so the site can filter rather than hide
     first_seen_at TEXT NOT NULL,
     last_seen_at  TEXT,
     digest_sent_at TEXT
@@ -67,6 +68,7 @@ CREATE TABLE IF NOT EXISTS round_sources (
     title        TEXT DEFAULT '',
     published_at TEXT,
     amount_value REAL,                      -- what this outlet reported
+    currency     TEXT DEFAULT '',           -- and in which currency: outlets convert
     seen_at      TEXT NOT NULL,
     PRIMARY KEY (round_id, article_url)
 );

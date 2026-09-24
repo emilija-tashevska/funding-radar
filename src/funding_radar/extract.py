@@ -52,6 +52,11 @@ When it is a round, extract only what the text supports:
 
 When is_round is false, leave the other fields empty and put the reason in summary.
 
+Judge every article on its own. Two articles covering the same round are both
+rounds, even when they appear side by side and even when the amounts differ because
+one outlet converted the currency: report each one. Merging duplicates happens later,
+and a round reported twice is stronger evidence, not weaker.
+
 A headline alone is often all you get. That is fine: extract what it supports and
 lower the confidence."""
 

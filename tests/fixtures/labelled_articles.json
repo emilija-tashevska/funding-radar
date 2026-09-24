@@ -1,0 +1,327 @@
+{
+  "_readme": [
+    "Hand-labelled from the article text, NOT from what the model returned: copying the",
+    "model's own output would only prove it agrees with itself.",
+    "null means the headline does not support an answer, so it is not scored.",
+    "\"judgement\": true marks a case where the right answer is a preference, not a fact.",
+    "Every title and url is a real article the pipeline saw; nothing here is invented."
+  ],
+  "articles": [
+    {
+      "id": "morphotonics",
+      "title": "Morphotonics raises €40M to expand its display tech into data centers",
+      "outlet": "TechCrunch",
+      "published_at": "2026-09-21T00:00:00+00:00",
+      "expect": {
+        "is_round": true,
+        "company": "Morphotonics",
+        "amount_value": 40000000,
+        "currency": "EUR",
+        "stage": null,
+        "region": null
+      },
+      "url": "https://techcrunch.com/2026/09/21/morphotonics-raises-e40m-to-expand-its-display-tech-into-data-centers/"
+    },
+    {
+      "id": "basecamp",
+      "title": "Anthropic and Nvidia back Basecamp Research in $140M Series C",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-23T00:00:00+00:00",
+      "note": "Investors lead the headline; the company that raised is Basecamp Research.",
+      "expect": {
+        "is_round": true,
+        "company": "Basecamp Research",
+        "amount_value": 140000000,
+        "currency": "USD",
+        "stage": "series c",
+        "region": null
+      },
+      "url": "https://tech.eu/2026/09/23/anthropic-and-nvidia-back-basecamp-research-in-140m-series-c/"
+    },
+    {
+      "id": "clastix_italy",
+      "title": "Italy’s Clastix raises €2.9 million with Mistral backing to build sovereign Kubernetes infrastructure for Europe",
+      "outlet": "EU-Startups",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "expect": {
+        "is_round": true,
+        "company": "Clastix",
+        "amount_value": 2900000,
+        "currency": "EUR",
+        "stage": null,
+        "region": "europe"
+      },
+      "url": "https://www.eu-startups.com/2026/09/italys-clastix-raises-e2-9-million-with-mistral-backing-to-build-sovereign-kubernetes-infrastructure-for-europe/"
+    },
+    {
+      "id": "clastix_bags",
+      "title": "Clastix bags €2.9M to tackle the complexity of Kubernetes at scale",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "note": "Same round as clastix_italy: the pair must deduplicate to one round.",
+      "expect": {
+        "is_round": true,
+        "company": "Clastix",
+        "amount_value": 2900000,
+        "currency": "EUR",
+        "stage": null,
+        "region": null
+      },
+      "url": "https://tech.eu/2026/09/24/clastix-bags-eur29m-to-tackle-the-complexity-of-kubernetes-at-scale/"
+    },
+    {
+      "id": "stasher",
+      "title": "London traveltech Stasher secures £3M for global expansion",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-23T00:00:00+00:00",
+      "expect": {
+        "is_round": true,
+        "company": "Stasher",
+        "amount_value": 3000000,
+        "currency": "GBP",
+        "stage": null,
+        "region": "uk"
+      },
+      "url": "https://tech.eu/2026/09/23/london-traveltech-stasher-secures-ps3m-for-global-expansion/"
+    },
+    {
+      "id": "magic_ai",
+      "title": "Magic AI raises £8m to take its AI-powered fitness mirror to the US",
+      "outlet": "Sifted",
+      "published_at": "2026-09-23T00:00:00+00:00",
+      "note": "Sterling implies the UK but the headline does not say so; region is not scored.",
+      "expect": {
+        "is_round": true,
+        "company": "Magic AI",
+        "amount_value": 8000000,
+        "currency": "GBP",
+        "stage": null,
+        "region": null
+      },
+      "url": "https://sifted.eu/articles/magic-ai-fitness-mirror-funding-round/"
+    },
+    {
+      "id": "duqu",
+      "title": "Amsterdam-based Duqu raises €1.5 million to unlock cash tied up in unpaid invoices",
+      "outlet": "EU-Startups",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "expect": {
+        "is_round": true,
+        "company": "Duqu",
+        "amount_value": 1500000,
+        "currency": "EUR",
+        "stage": null,
+        "region": "europe"
+      },
+      "url": "https://www.eu-startups.com/2026/09/amsterdam-based-duqu-raises-e1-5-million-to-unlock-cash-tied-up-in-unpaid-invoices/"
+    },
+    {
+      "id": "reply_next",
+      "title": "AI platform Reply Next secures €400K pre-seed funding",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "note": "Thousands, not millions: the rescaling must leave this alone.",
+      "expect": {
+        "is_round": true,
+        "company": "Reply Next",
+        "amount_value": 400000,
+        "currency": "EUR",
+        "stage": "pre-seed",
+        "region": null
+      },
+      "url": "https://tech.eu/2026/09/24/ai-platform-reply-next-secures-eur400k-pre-seed-funding/"
+    },
+    {
+      "id": "kontext",
+      "title": "Kontext raises $4M for runtime security platform for AI agents",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "expect": {
+        "is_round": true,
+        "company": "Kontext",
+        "amount_value": 4000000,
+        "currency": "USD",
+        "stage": null,
+        "region": null
+      },
+      "url": "https://tech.eu/2026/09/24/kontext-raises-4m-for-runtime-security-platform-for-ai-agents/"
+    },
+    {
+      "id": "50skills_eur",
+      "title": "Reykjavík-based 50skills raises €5.3 million to scale its AI-powered HR workflow automation platform",
+      "outlet": "EU-Startups",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "expect": {
+        "is_round": true,
+        "company": "50skills",
+        "amount_value": 5300000,
+        "currency": "EUR",
+        "stage": null,
+        "region": "europe"
+      },
+      "url": "https://www.eu-startups.com/2026/09/reykjavik-based-50skills-raises-e5-3-million-to-scale-its-ai-powered-hr-workflow-automation-platform/"
+    },
+    {
+      "id": "50skills_usd",
+      "title": "50skills raises $6M to scale its AI operating system for people workflows",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "note": "Same round as 50skills_eur, converted by the outlet. One round, two currencies.",
+      "expect": {
+        "is_round": true,
+        "company": "50skills",
+        "amount_value": 6000000,
+        "currency": "USD",
+        "stage": null,
+        "region": null
+      },
+      "url": "https://tech.eu/2026/09/24/50skills-raises-6m-to-scale-its-ai-operating-system-for-people-workflows/"
+    },
+    {
+      "id": "corridor",
+      "title": "Corridor raises $25M seed to build a health benefits brokerage for SMBs",
+      "outlet": "TechCrunch",
+      "published_at": "2026-09-21T00:00:00+00:00",
+      "expect": {
+        "is_round": true,
+        "company": "Corridor",
+        "amount_value": 25000000,
+        "currency": "USD",
+        "stage": "seed",
+        "region": null
+      },
+      "url": "https://techcrunch.com/2026/09/21/corridor-raises-25m-seed-to-build-a-health-benefits-brokerage-for-smbs/"
+    },
+    {
+      "id": "terasi",
+      "title": "Exclusive: NIF backs defence startup Terasi in €11m raise",
+      "outlet": "Sifted",
+      "published_at": "2026-09-22T00:00:00+00:00",
+      "note": "\"Exclusive:\" prefix and an investor-first headline; the company is Terasi.",
+      "expect": {
+        "is_round": true,
+        "company": "Terasi",
+        "amount_value": 11000000,
+        "currency": "EUR",
+        "stage": null,
+        "region": null
+      },
+      "url": "https://sifted.eu/articles/exclusive-nif-backs-defence-startup-terasi-in-e11m-raise/"
+    },
+    {
+      "id": "bird_debt",
+      "title": "Bird raises $450M in debt, headcount cut from 1,000 peak to 120",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-23T00:00:00+00:00",
+      "note": "Debt, not equity.",
+      "expect": {
+        "is_round": false,
+        "company": null,
+        "amount_value": null,
+        "currency": null,
+        "stage": null,
+        "region": null
+      },
+      "url": "https://tech.eu/2026/09/23/bird-raises-450m-in-debt-headcount-cut-from-1000-to-120/"
+    },
+    {
+      "id": "snorkel_valuation",
+      "title": "Snorkel AI triples valuation to $3.5B as demand for AI training data booms",
+      "outlet": "TechCrunch",
+      "published_at": "2026-09-22T00:00:00+00:00",
+      "note": "A valuation story, no new round announced. The model got this one wrong on the live run.",
+      "expect": {
+        "is_round": false,
+        "company": null,
+        "amount_value": null,
+        "currency": null,
+        "stage": null,
+        "region": null
+      },
+      "url": "https://techcrunch.com/2026/09/22/snorkel-ai-triples-valuation-to-3-5b-as-demand-for-ai-training-data-booms/"
+    },
+    {
+      "id": "switzerland_list",
+      "title": "Switzerland's top-funded tech companies in H1 2026",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "note": "A list article about many companies, not one round.",
+      "expect": {
+        "is_round": false,
+        "company": null,
+        "amount_value": null,
+        "currency": null,
+        "stage": null,
+        "region": null
+      },
+      "url": "https://tech.eu/2026/09/24/switzerlands-top-funded-tech-companies-in-h1-2026/"
+    },
+    {
+      "id": "manus_rumour",
+      "title": "Manus seeks $4B valuation in new $500M fundraise as it resumes independent ops",
+      "outlet": "TechCrunch",
+      "published_at": "2026-09-18T00:00:00+00:00",
+      "judgement": true,
+      "note": "\"Seeks\" — a raise in progress, not closed. Counts as a round only if you want rumoured rounds.",
+      "expect": {
+        "is_round": false,
+        "company": null,
+        "amount_value": null,
+        "currency": null,
+        "stage": null,
+        "region": null
+      },
+      "url": "https://techcrunch.com/2026/09/18/manus-seeks-4b-valuation-in-new-500m-fundraise-as-it-resumes-independent-ops/"
+    },
+    {
+      "id": "owow_studio",
+      "title": "OWOW Venture Studio lands €2.65M to build B2B startups for traditional industries",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "judgement": true,
+      "note": "A venture studio raising to build companies. A round, but is a studio a client?",
+      "expect": {
+        "is_round": true,
+        "company": "OWOW Venture Studio",
+        "amount_value": 2650000,
+        "currency": "EUR",
+        "stage": null,
+        "region": null
+      },
+      "url": "https://tech.eu/2026/09/24/owow-venture-studio-lands-eur265m-to-build-b2b-startups-for-traditional-industries/"
+    },
+    {
+      "id": "unnamed_studio",
+      "title": "A startup that builds other startups raised $100M and is all-in on physical AI",
+      "outlet": "TechCrunch",
+      "published_at": "2026-09-18T00:00:00+00:00",
+      "note": "The company is never named in the headline, so the pipeline drops it for having no company. Judgement: is an unnamed round worth chasing?",
+      "expect": {
+        "is_round": true,
+        "company": null,
+        "amount_value": 100000000,
+        "currency": "USD",
+        "stage": null,
+        "region": null
+      },
+      "judgement": true,
+      "url": "https://techcrunch.com/2026/09/18/a-startup-that-builds-other-startups-raised-100m-and-is-all-in-on-physical-ai/"
+    },
+    {
+      "id": "japan_robots",
+      "title": "Europeans in Japan raise $1.2M to put modular humanoid robots to work",
+      "outlet": "Tech.eu",
+      "published_at": "2026-09-24T00:00:00+00:00",
+      "note": "European founders, Japanese base: the company is not in our regions.",
+      "expect": {
+        "is_round": true,
+        "company": null,
+        "amount_value": 1200000,
+        "currency": "USD",
+        "stage": null,
+        "region": "other"
+      },
+      "url": "https://tech.eu/2026/09/24/brits-in-japan-raise-1m-to-put-modular-humanoid-robots-to-work/"
+    }
+  ]
+}
