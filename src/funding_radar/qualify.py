@@ -84,8 +84,10 @@ def qualifies(round_: Round, rules: Rules) -> Verdict:
     stage = normalize_stage(round_.stage or round_.stage_raw)
     if rules.regions and (round_.region or "").lower() not in rules.regions:
         return Verdict(False, f"region {round_.region or 'unknown'} is outside the brief")
-    if rules.stages and stage not in rules.stages:
-        return Verdict(False, f"stage {stage or 'unknown'} is outside the brief")
+    if stage and rules.stages and stage not in rules.stages:
+        return Verdict(False, f"stage {stage} is outside the brief")
+    # Headlines often name no stage at all. Dropping those would lose real rounds,
+    # so they qualify on size alone and stay in the unconfirmed tier.
 
     floor = rules.floor_for(round_.investors)
     amount = approx_usd(round_.amount_value, round_.currency)

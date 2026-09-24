@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
 from src.funding_radar.llm import LLMError, complete_json
 from src.funding_radar.models import Round
@@ -36,19 +37,31 @@ When it is a round, extract only what the text supports:
 - company: the company that raised, not its investors or customers
 - company_domain: only if the text gives it; never guess a domain from the name
 - stage: exactly as described (pre-seed, seed, Series A...); "" when unstated
-- amount_value and currency: the headline figure, as reported, in its own currency;
-  amount_value is a number without separators. Leave both empty when undisclosed.
-- round_date: ISO date of the round if stated, else ""
-- investors: named participating investors; lead_investor when the text says who led
-- hq_city and hq_country: where the company is based, when stated
-- region: uk, europe, us, or other — where the company is based, not its investors
+- amount_value and currency: the headline figure in its own currency, written in
+  WHOLE UNITS, not millions: $12M is 12000000, €4.35 million is 4350000, £800k is
+  800000. Leave both empty when the amount is undisclosed.
+- investors: named participating investors, the lead first when the text says who led
+- hq: "City, Country" where the company is based, when stated
+- region: exactly one of uk, europe, us, other — where the company is based, not
+  where its investors are. Always give one; infer from the city or country when the
+  text does not say it outright.
 - sector: exactly one label from the supplied list; "Other" when none fit
 - ai_native: true when AI is the product or core to it, not when merely mentioned
 - evidence: the sentence that states the amount, quoted verbatim from the text
-- confidence: 0-1, how sure you are of company, amount and stage together
+- summary: one sentence on what the company does
+
+When is_round is false, leave the other fields empty and put the reason in summary.
 
 A headline alone is often all you get. That is fine: extract what it supports and
 lower the confidence."""
+
+# Structured outputs cap an item at 14 properties, so every field here earns its
+# place. Casualties, and how they are covered instead:
+#   round_date  -> the article's publication date, which is within days of the round
+#   lead investor -> the prompt asks for investors lead-first, so it is investors[0]
+#   rejection reason -> reuses `summary` when is_round is false
+#   confidence  -> inferred from whether amount and stage are present
+MAX_SCHEMA_FIELDS = 14
 
 RESULT_SCHEMA = {
     "type": "object",
@@ -60,24 +73,18 @@ RESULT_SCHEMA = {
                 "properties": {
                     "index": {"type": "integer"},
                     "is_round": {"type": "boolean"},
-                    "rejection": {"type": "string"},
                     "company": {"type": "string"},
                     "company_domain": {"type": "string"},
                     "summary": {"type": "string"},
                     "stage": {"type": "string"},
-                    "amount_value": {"type": ["number", "null"]},
+                    "amount_value": {"type": "number"},
                     "currency": {"type": "string"},
-                    "amount_text": {"type": "string"},
-                    "round_date": {"type": "string"},
                     "investors": {"type": "array", "items": {"type": "string"}},
-                    "lead_investor": {"type": "string"},
-                    "hq_city": {"type": "string"},
-                    "hq_country": {"type": "string"},
-                    "region": {"type": "string", "enum": ["uk", "europe", "us", "other", ""]},
+                    "region": {"type": "string"},
+                    "hq": {"type": "string"},
                     "sector": {"type": "string"},
                     "ai_native": {"type": "boolean"},
                     "evidence": {"type": "string"},
-                    "confidence": {"type": "number"},
                 },
                 "required": ["index", "is_round"],
                 "additionalProperties": False,
@@ -106,6 +113,55 @@ def build_prompt(candidates: list, sectors: list[str]) -> str:
     )
 
 
+# Country to region, for when the model leaves region blank but names a location.
+UK_NAMES = {"united kingdom", "uk", "u.k.", "great britain", "england", "scotland", "wales",
+            "northern ireland", "britain"}
+EUROPE_NAMES = {
+    "ireland", "france", "germany", "spain", "italy", "netherlands", "belgium", "portugal",
+    "sweden", "norway", "denmark", "finland", "iceland", "poland", "czechia", "czech republic",
+    "austria", "switzerland", "estonia", "latvia", "lithuania", "greece", "romania", "bulgaria",
+    "hungary", "slovakia", "slovenia", "croatia", "serbia", "ukraine", "luxembourg", "malta",
+    "cyprus", "europe",
+}
+US_NAMES = {"united states", "usa", "us", "u.s.", "u.s.a."}
+# A round written in millions rather than whole units: "12" cannot be a real round size.
+IMPLAUSIBLY_SMALL = 100_000
+MILLION_RE = re.compile(r"\b(m|mn|million|millions|millionen|miljoen|miljoner|millones)\b|\d\s*m\b", re.I)
+BILLION_RE = re.compile(r"\b(bn|billion|billions|milliarde[nr]?|miljard)\b|\d\s*b\b", re.I)
+
+
+def region_for(country: str, city: str = "") -> str:
+    """Map a stated location onto our four regions."""
+    for value in (country, city):
+        text = (value or "").strip().lower().rstrip(".")
+        if not text:
+            continue
+        if text in UK_NAMES or text in {"london", "manchester", "cambridge", "oxford", "edinburgh", "bristol"}:
+            return "uk"
+        if text in US_NAMES or text in {"san francisco", "new york", "boston", "seattle", "austin"}:
+            return "us"
+        if text in EUROPE_NAMES or text in {"berlin", "paris", "amsterdam", "stockholm", "madrid",
+                                            "milan", "lisbon", "dublin", "helsinki", "copenhagen",
+                                            "oslo", "zurich", "munich", "vienna", "warsaw", "tallinn"}:
+            return "europe"
+    return ""
+
+
+def rescale_amount(amount: float | None, text: str) -> float | None:
+    """Correct an amount written in millions or billions rather than whole units.
+
+    Models report "$140M" as 140 often enough that trusting the raw number would
+    silently drop every large round below the size floor.
+    """
+    if amount is None or amount >= IMPLAUSIBLY_SMALL:
+        return amount
+    if BILLION_RE.search(text):
+        return amount * 1_000_000_000
+    if MILLION_RE.search(text):
+        return amount * 1_000_000
+    return amount
+
+
 def _clean_round(payload: dict, article) -> Round:
     """Turn one model result into a Round, normalising what we can check ourselves."""
     amount = payload.get("amount_value")
@@ -113,26 +169,40 @@ def _clean_round(payload: dict, article) -> Round:
         amount = float(amount) if amount not in (None, "") else None
     except (TypeError, ValueError):
         amount = None
+    evidence = str(payload.get("evidence") or "").strip()
+    amount = rescale_amount(amount, f"{evidence} {article.title}")
+
     stage_raw = str(payload.get("stage") or "").strip()
+    investors = [str(name).strip() for name in payload.get("investors") or [] if str(name).strip()]
+    hq = str(payload.get("hq") or "").strip()
+    city, _, country = hq.partition(",")
+    stage = normalize_stage(stage_raw) or normalize_stage(article.title)
+    region = str(payload.get("region") or "").strip().lower()
+    # "other" is also worth checking: a Helsinki company came back as other when the
+    # location in the same result says plainly that it is European.
+    if region not in ("uk", "europe", "us"):
+        region = region_for(country, city) or region
     return Round(
         company=str(payload.get("company") or "").strip(),
         summary=str(payload.get("summary") or "").strip(),
-        stage=normalize_stage(stage_raw) or normalize_stage(article.title),
+        stage=stage,
         stage_raw=stage_raw,
-        amount_text=str(payload.get("amount_text") or "").strip(),
         amount_value=amount,
         currency=str(payload.get("currency") or "").strip().upper(),
-        round_date=str(payload.get("round_date") or "").strip() or article.published_at,
-        investors=[str(name).strip() for name in payload.get("investors") or [] if str(name).strip()],
-        lead_investor=str(payload.get("lead_investor") or "").strip(),
-        hq_city=str(payload.get("hq_city") or "").strip(),
-        hq_country=str(payload.get("hq_country") or "").strip(),
-        region=str(payload.get("region") or "").strip().lower(),
+        # Boards rarely date the round itself; the article is within days of it.
+        round_date=article.published_at,
+        investors=investors,
+        lead_investor=investors[0] if investors else "",
+        hq_city=city.strip(),
+        hq_country=country.strip(),
+        region=region,
         sector=str(payload.get("sector") or "").strip(),
         ai_native=bool(payload.get("ai_native")),
         company_domain=str(payload.get("company_domain") or "").strip(),
-        evidence=str(payload.get("evidence") or "").strip(),
-        confidence=float(payload.get("confidence") or 0),
+        evidence=evidence,
+        # Nothing to calibrate a self-reported score against, so confidence reflects
+        # how much of the round the article actually pinned down.
+        confidence=round(0.4 + 0.3 * bool(amount) + 0.2 * bool(stage) + 0.1 * bool(payload.get("company_domain")), 2),
     )
 
 
@@ -156,7 +226,8 @@ def extract_batch(candidates: list, sectors: list[str], *, model: str | None = N
         candidate = candidates[index]
         article = candidate.article if hasattr(candidate, "article") else candidate
         if not item.get("is_round"):
-            results[index] = str(item.get("rejection") or "not a funding round")
+            # The prompt reuses `summary` for the reason when this is not a round.
+            results[index] = str(item.get("summary") or "not a funding round")
             continue
         round_ = _clean_round(item, article)
         if not round_.company:

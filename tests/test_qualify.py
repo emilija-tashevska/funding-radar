@@ -90,3 +90,10 @@ def test_confirmation_needs_specifics_plus_either_a_domain_or_a_second_outlet():
     assert not is_confirmed(_round(stage="", stage_raw=""))          # no stage
     assert not is_confirmed(_round(company_domain=""))               # unresolved, single outlet
     assert is_confirmed(_round(company_domain=""), distinct_outlets=2)
+
+
+def test_a_round_with_no_stage_named_still_qualifies_on_size():
+    """Headlines often omit the stage; those rounds stay in the unconfirmed tier."""
+    unnamed = _round(stage="", stage_raw="")
+    assert qualifies(unnamed, RULES).qualified
+    assert not is_confirmed(unnamed)

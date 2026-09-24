@@ -29,6 +29,11 @@ def complete_json(system: str, user: str, schema: dict, *, model: str, effort: s
     import anthropic
 
     client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    if settings.ANTHROPIC_WORKSPACE_ID:
+        # An org-level key is refused without this; a workspace-scoped key ignores it.
+        client = client.with_options(
+            default_headers={"anthropic-workspace-id": settings.ANTHROPIC_WORKSPACE_ID}
+        )
     kwargs: dict = {
         "model": model,
         "max_tokens": max_tokens,
@@ -45,7 +50,10 @@ def complete_json(system: str, user: str, schema: dict, *, model: str, effort: s
         else:
             response = client.messages.create(**kwargs)
     except Exception as exc:  # noqa: BLE001 - surfaced to the caller as one error type
-        raise LLMError(str(exc)) from exc
+        # The SDK's str() can be a bare "Error code: 400"; the body says what is wrong.
+        body = getattr(getattr(exc, "response", None), "text", "")
+        detail = f"{exc}" + (f" | {body[:400]}" if body and str(body) not in str(exc) else "")
+        raise LLMError(detail) from exc
 
     if response.stop_reason == "refusal":
         raise LLMError("model declined the request")

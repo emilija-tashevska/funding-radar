@@ -25,17 +25,17 @@ def test_a_clean_round_is_extracted_with_its_evidence(monkeypatch):
     monkeypatch.setattr(extractor, "complete_json", _reply({
         "index": 0, "is_round": True, "company": "Metris Energy", "company_domain": "metrisenergy.com",
         "summary": "AI platform for renewable energy assets", "stage": "Seed", "amount_value": 4350000,
-        "currency": "EUR", "amount_text": "€4.35 million", "round_date": "2026-09-19",
-        "investors": ["Ada Ventures", "Antler"], "lead_investor": "Ada Ventures",
-        "hq_city": "London", "hq_country": "United Kingdom", "region": "uk",
-        "sector": "Climate and energy", "ai_native": True,
-        "evidence": "Metris Energy raises €4.35 million", "confidence": 0.9,
+        "currency": "EUR", "investors": ["Ada Ventures", "Antler"], "hq": "London, United Kingdom",
+        "region": "uk", "sector": "Climate and energy", "ai_native": True,
+        "evidence": "Metris Energy raises €4.35 million",
     }))
     results = extractor.extract_batch([_article("Metris Energy raises €4.35 million")], SECTORS)
     round_ = results[0]
     assert isinstance(round_, Round)
     assert (round_.company, round_.stage, round_.amount_value, round_.currency) == ("Metris Energy", "seed", 4350000.0, "EUR")
+    # The prompt asks for the lead first, so investors[0] is the lead.
     assert round_.investors == ["Ada Ventures", "Antler"] and round_.lead_investor == "Ada Ventures"
+    assert (round_.hq_city, round_.hq_country) == ("London", "United Kingdom")
     assert round_.region == "uk" and round_.ai_native and round_.evidence.startswith("Metris Energy raises")
 
 
@@ -44,7 +44,7 @@ def test_a_clean_round_is_extracted_with_its_evidence(monkeypatch):
     ["venture fund raising its own capital", "debt facility, no equity", "valuation change only", "weekly round-up"],
 )
 def test_non_rounds_come_back_as_rejections(monkeypatch, rejection):
-    monkeypatch.setattr(extractor, "complete_json", _reply({"index": 0, "is_round": False, "rejection": rejection}))
+    monkeypatch.setattr(extractor, "complete_json", _reply({"index": 0, "is_round": False, "summary": rejection}))
     results = extractor.extract_batch([_article("Something that is not a round")], SECTORS)
     assert results[0] == rejection
 
@@ -69,9 +69,9 @@ def test_the_stage_is_read_from_the_headline_when_the_model_omits_it(monkeypatch
     assert result.stage == "series a" and result.stage_raw == ""
 
 
-def test_the_article_date_is_used_when_the_round_date_is_missing(monkeypatch):
+def test_the_article_date_is_used_as_the_round_date(monkeypatch):
     monkeypatch.setattr(extractor, "complete_json", _reply({
-        "index": 0, "is_round": True, "company": "Acme", "round_date": "", "stage": "Seed",
+        "index": 0, "is_round": True, "company": "Acme", "stage": "Seed",
     }))
     result = extractor.extract_batch([_article("Acme raises seed", published="2026-09-18T09:00:00+00:00")], SECTORS)[0]
     assert result.round_date == "2026-09-18T09:00:00+00:00"
@@ -154,3 +154,76 @@ def test_responses_parse_through_a_stray_code_fence(text, expected):
 def test_unusable_responses_raise_rather_than_return_junk(text):
     with pytest.raises(LLMError):
         parse_json(text)
+
+
+def test_the_schema_stays_inside_the_structured_output_limit():
+    """The API rejects more than 14 properties per item; this is the guard rail."""
+    fields = extractor.RESULT_SCHEMA["properties"]["results"]["items"]["properties"]
+    assert len(fields) <= extractor.MAX_SCHEMA_FIELDS
+
+
+def test_confidence_reflects_how_much_the_article_pinned_down(monkeypatch):
+    monkeypatch.setattr(extractor, "complete_json", _reply({
+        "index": 0, "is_round": True, "company": "Acme", "stage": "Seed",
+        "amount_value": 5_000_000, "company_domain": "acme.ai",
+    }))
+    detailed = extractor.extract_batch([_article("Acme raises $5M seed")], SECTORS)[0]
+
+    monkeypatch.setattr(extractor, "complete_json", _reply({"index": 0, "is_round": True, "company": "Acme"}))
+    vague = extractor.extract_batch([_article("Acme raises funding")], SECTORS)[0]
+    assert detailed.confidence > vague.confidence
+
+
+@pytest.mark.parametrize(
+    "amount,text,expected",
+    [
+        (140, "Basecamp Research raises $140M Series C", 140_000_000),
+        (4.35, "raises €4.35 million seed", 4_350_000),
+        (8, "Magic AI raises £8m", 8_000_000),
+        (3.9, "Crusoe raises $3.9B to build data centers", 3_900_000_000),
+        (12_000_000, "Acme raises $12M", 12_000_000),      # already whole units
+        (800_000, "Acme raises £800k", 800_000),           # small but plausible
+        (None, "Acme raises an undisclosed sum", None),
+    ],
+)
+def test_amounts_written_in_millions_are_corrected(amount, text, expected):
+    assert extractor.rescale_amount(amount, text) == expected
+
+
+@pytest.mark.parametrize(
+    "country,city,expected",
+    [
+        ("United Kingdom", "London", "uk"), ("", "London", "uk"), ("Germany", "Berlin", "europe"),
+        ("", "Helsinki", "europe"), ("United States", "San Francisco", "us"), ("", "", ""),
+        ("Singapore", "Singapore", ""),
+    ],
+)
+def test_region_is_inferred_when_the_model_leaves_it_blank(country, city, expected):
+    assert extractor.region_for(country, city) == expected
+
+
+def test_a_blank_region_is_filled_in_from_the_location(monkeypatch):
+    monkeypatch.setattr(extractor, "complete_json", _reply({
+        "index": 0, "is_round": True, "company": "Verda", "hq": "Helsinki, Finland",
+        "region": "", "amount_value": 164.8, "currency": "EUR", "evidence": "raising €164.8 million",
+    }))
+    result = extractor.extract_batch([_article("Helsinki's Verda raises €164.8 million")], SECTORS)[0]
+    assert result.region == "europe"
+    assert result.amount_value == 164_800_000
+
+
+def test_a_location_overrides_an_other_region(monkeypatch):
+    """A Helsinki company labelled "other" is European; the location is the better evidence."""
+    monkeypatch.setattr(extractor, "complete_json", _reply({
+        "index": 0, "is_round": True, "company": "Verda", "hq": "Helsinki, Finland",
+        "region": "other", "amount_value": 164_800_000, "currency": "EUR",
+    }))
+    assert extractor.extract_batch([_article("Verda raises €164.8 million")], SECTORS)[0].region == "europe"
+
+
+def test_a_stated_region_outside_europe_is_respected(monkeypatch):
+    monkeypatch.setattr(extractor, "complete_json", _reply({
+        "index": 0, "is_round": True, "company": "Corridor", "hq": "New York, United States",
+        "region": "us", "amount_value": 25_000_000, "currency": "USD",
+    }))
+    assert extractor.extract_batch([_article("Corridor raises $25M seed")], SECTORS)[0].region == "us"

@@ -18,6 +18,8 @@ def _path(value: str, default: Path) -> Path:
 
 class Settings:
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    # Org-level keys must name a workspace; keys created inside a workspace need not.
+    ANTHROPIC_WORKSPACE_ID: str = os.getenv("ANTHROPIC_WORKSPACE_ID", "")
     # Extraction is high volume and mechanical; scoring is judgement on a handful.
     EXTRACT_MODEL: str = os.getenv("EXTRACT_MODEL", "claude-sonnet-5")
     SCORE_MODEL: str = os.getenv("SCORE_MODEL", "claude-opus-5")
