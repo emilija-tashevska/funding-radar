@@ -42,12 +42,34 @@ def _round_payload(row: dict) -> dict:
         "qualified_reason": row.get("qualified_reason") or "",
         "investors": row.get("investors") or [],
         "evidence": row.get("evidence") or "",
-        "sources": [
-            {"outlet": source.get("outlet") or "", "url": source.get("url") or source.get("article_url") or "",
-             "title": source.get("title") or ""}
-            for source in row.get("sources") or []
-        ],
+        "sources": _sources(row.get("sources") or []),
     }
+
+
+def _sources(rows: list[dict]) -> list[dict]:
+    """One link per publisher, the ones you can actually click first.
+
+    Our source names carry where we found the story ("Google News · Dealroom"),
+    which is bookkeeping: on the page it should say Dealroom.
+    """
+    cleaned = []
+    for row in rows:
+        url = row.get("url") or row.get("article_url") or ""
+        outlet = (row.get("outlet") or "").split("·")[-1].strip()
+        if not url:
+            continue
+        cleaned.append({"outlet": outlet or "the article", "url": url,
+                        "title": row.get("title") or "",
+                        "direct": "news.google.com" not in url})
+    cleaned.sort(key=lambda source: (not source["direct"], source["outlet"].lower()))
+    seen, unique = set(), []
+    for source in cleaned:
+        key = source["outlet"].lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append({k: source[k] for k in ("outlet", "url", "title")})
+    return unique
 
 
 def build_payload(db: FundingDatabase, *, window_days: int = 120) -> dict:

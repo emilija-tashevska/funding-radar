@@ -91,3 +91,19 @@ def test_a_closing_script_tag_in_the_data_cannot_break_out_of_the_page(tmp_path,
     # so the parser never leaves the JSON block early.
     assert html.count("</script>") == 2
     assert r"<\/script><script>alert(1)<\/script>" in html
+
+
+def test_a_publisher_is_named_once_and_direct_links_come_first(db):
+    from src.funding_radar.models import Round
+
+    round_ = Round(company="mika", stage="seed", amount_value=6_000_000, currency="EUR",
+                   region="europe", round_date="2026-09-20T00:00:00+00:00")
+    company_id = db.upsert_company(round_)
+    round_id, _ = db.upsert_round(round_, company_id)
+    for outlet, url in (("Google News · Tech.eu", "https://news.google.com/rss/articles/abc"),
+                        ("Google News · Tech.eu", "https://news.google.com/rss/articles/def"),
+                        ("Finsmes", "https://finsmes.com/mika")):
+        db.add_round_source(round_id, _article(f"mika raises €6M", url, outlet), 6_000_000, "EUR")
+    sources = site.build_payload(db, window_days=120)["rounds"][0]["sources"]
+    assert [s["outlet"] for s in sources] == ["Finsmes", "Tech.eu"]
+    assert all("·" not in s["outlet"] for s in sources)

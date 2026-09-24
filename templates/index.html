@@ -6,66 +6,85 @@
 <title>Funding Radar</title>
 <style>
 :root {
-  --bg: #f6f6f4; --panel: #fff; --ink: #14140f; --muted: #6b6b60; --line: #e2e2dc;
-  --accent: #b44c1f; --accent-soft: #fbeee7; --good: #2f6f4f; --warn: #8a6d1f;
-  --chip: #efefea; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.04);
+  --bg: #fbfbfa; --panel: #fff; --ink: #16181c; --ink-2: #3f4550; --muted: #797f8a;
+  --line: #e4e4e1; --line-2: #efefec; --accent: #17594a; --accent-ink: #fff;
+  --accent-soft: #eef3f1; --radius: 10px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #14140f; --panel: #1c1c17; --ink: #f2f2ec; --muted: #9b9b8f; --line: #2e2e26;
-    --accent: #e8825a; --accent-soft: #2a1d16; --good: #6fbf93; --warn: #d6b35c;
-    --chip: #25251e; --shadow: none;
+    --bg: #0f1012; --panel: #16181b; --ink: #f0f0ee; --ink-2: #c7c9cd; --muted: #8b9098;
+    --line: #26282c; --line-2: #1e2023; --accent: #6bbfa4; --accent-ink: #0f1012;
+    --accent-soft: #17211e;
   }
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; }
-.wrap { max-width: 1060px; margin: 0 auto; padding: 28px 16px 80px; }
-header h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.02em; }
-header p { margin: 0; color: var(--muted); font-size: 13px; }
-.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 16px 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
-.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.row + .row { margin-top: 8px; }
-input[type=search], select {
-  font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 8px; padding: 7px 10px; min-width: 0;
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
-input[type=search] { flex: 1 1 220px; }
+.wrap { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 20px; }
+h1 {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-size: 30px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 6px;
+}
+header p { margin: 0; color: var(--muted); font-size: 13px; }
+
+.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 14px 0 14px; border-bottom: 1px solid var(--line); }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row + .row { margin-top: 10px; }
+.label { width: 52px; flex: 0 0 auto; font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.group { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+input[type=search], select {
+  font: inherit; font-size: 14px; color: inherit; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; min-width: 0;
+}
+input[type=search] { flex: 1 1 240px; }
+input[type=search]::placeholder { color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .chip {
   font: inherit; font-size: 13px; cursor: pointer; border: 1px solid var(--line);
-  background: var(--chip); color: var(--ink); border-radius: 999px; padding: 5px 11px;
+  background: var(--panel); color: var(--ink-2); border-radius: 999px; padding: 5px 12px;
+  transition: background .12s, color .12s, border-color .12s;
 }
-.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.group { display: inline-flex; flex-wrap: wrap; gap: 8px; }
-.label { width: 54px; flex: 0 0 auto; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 2px; }
-.count { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; box-shadow: var(--shadow); }
-.card.out { opacity: .72; }
-.head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
-.name { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.chip .n { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; margin-left: 2px; }
+.chip[aria-pressed="true"] .n { color: var(--accent-ink); opacity: .75; }
+.none { font-size: 13px; color: var(--muted); }
+
+.count { color: var(--muted); font-size: 13px; margin: 18px 0 6px; }
+.card { border-bottom: 1px solid var(--line-2); padding: 20px 0; }
+.card:last-child { border-bottom: 0; }
+.head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.name { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
 .name a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
-.amount { font-size: 18px; font-weight: 600; color: var(--accent); }
-.stage { color: var(--muted); }
+.name a:hover { border-color: var(--accent); }
+.amount { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stage { color: var(--muted); font-size: 14px; }
 .when { margin-left: auto; color: var(--muted); font-size: 13px; white-space: nowrap; }
-.summary { margin: 8px 0 0; }
-.meta { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
-.meta b { color: var(--ink); font-weight: 500; }
-.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
-.badge.ok { background: var(--accent-soft); color: var(--good); }
-.badge.warn { color: var(--warn); }
-.badge.out { color: var(--accent); background: var(--accent-soft); }
-details { margin-top: 10px; }
-summary { cursor: pointer; font-size: 13px; color: var(--muted); }
-blockquote { margin: 8px 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--muted); font-size: 14px; }
-.srcs { list-style: none; padding: 0; margin: 6px 0 0; font-size: 13px; }
-.srcs a { color: var(--accent); }
-.empty { text-align: center; color: var(--muted); padding: 48px 0; }
-footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
+.summary { margin: 7px 0 0; color: var(--ink-2); }
+.meta { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+.meta b { color: var(--ink-2); font-weight: 500; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.tag { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.tag.flag { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.read { margin-top: 10px; font-size: 13px; }
+.read span { color: var(--muted); }
+.read a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+.read a:hover { border-color: currentColor; }
+.read a + a::before { content: " · "; color: var(--muted); border: 0; }
+.read .more { color: var(--muted); margin-left: 8px; }
+blockquote { margin: 10px 0 0; padding-left: 12px; border-left: 2px solid var(--line); color: var(--muted); font-size: 13px; }
+.empty { color: var(--muted); padding: 48px 0; text-align: center; }
+footer { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+footer button { font: inherit; font-size: 12px; background: none; border: 0; color: var(--muted); cursor: pointer; padding: 0; text-decoration: underline; }
 @media (max-width: 560px) {
-  .when { margin-left: 0; width: 100%; }
-  /* The filters are three rows deep on a phone; sticking them would eat the screen. */
+  .wrap { padding: 28px 16px 60px; }
   .bar { position: static; }
   .label { width: auto; }
+  .when { margin-left: 0; width: 100%; }
 }
 </style>
 </head>
@@ -79,45 +98,54 @@ footer { margin-top: 28px; color: var(--muted); font-size: 12px; }
   <div class="bar">
     <div class="row">
       <input type="search" id="q" placeholder="Search company, investor, sector…" autocomplete="off">
-      <select id="sort">
+      <select id="sort" aria-label="Sort">
         <option value="date">Newest first</option>
         <option value="amount">Largest first</option>
       </select>
     </div>
+    <div class="row"><span class="label">Where</span><span id="regions" class="group"></span></div>
+    <div class="row"><span class="label">Stage</span><span id="stages" class="group"></span></div>
     <div class="row">
-      <span class="label">Region</span><span id="regions" class="group"></span>
-    </div>
-    <div class="row">
-      <span class="label">Stage</span><span id="stages" class="group"></span>
-    </div>
-    <div class="row">
-      <span class="label">Show</span>
-      <button class="chip" id="f-brief" aria-pressed="true">In brief only</button>
-      <button class="chip" id="f-confirmed" aria-pressed="false">Confirmed only</button>
-      <button class="chip" id="f-ai" aria-pressed="false">AI-native</button>
-      <button class="chip" id="f-studio" aria-pressed="false">Hide studios</button>
-      <select id="minamt">
-        <option value="0">Any size</option>
-        <option value="1000000">1M+</option>
-        <option value="2000000">2M+</option>
-        <option value="5000000">5M+</option>
-        <option value="10000000">10M+</option>
-        <option value="25000000">25M+</option>
-      </select>
+      <span class="label">Filter</span>
+      <span class="group">
+        <select id="minamt" aria-label="Minimum size">
+          <option value="0">Any size</option>
+          <option value="1000000">1M+</option>
+          <option value="2000000">2M+</option>
+          <option value="5000000">5M+</option>
+          <option value="10000000">10M+</option>
+          <option value="25000000">25M+</option>
+        </select>
+        <button class="chip" id="f-ai" aria-pressed="false">AI-native</button>
+        <button class="chip" id="f-studio" aria-pressed="false">Hide studios</button>
+        <button class="chip ctrl" id="f-brief" aria-pressed="true" hidden>In brief only</button>
+        <button class="chip ctrl" id="f-confirmed" aria-pressed="false" hidden>Confirmed only</button>
+      </span>
     </div>
   </div>
 
   <p class="count" id="count"></p>
   <div id="list"></div>
-  <footer id="footer"></footer>
+  <footer>
+    <span id="footnote"></span>
+    <button id="mode"></button>
+  </footer>
 </div>
 
 <script id="payload" type="application/json">__DATA__</script>
 <script>
 const DATA = JSON.parse(document.getElementById('payload').textContent);
 const ROUNDS = DATA.rounds;
-const SYM = { USD: '$', GBP: '£', EUR: '€', CHF: 'CHF ', SEK: 'SEK ', NOK: 'NOK ', DKK: 'DKK ', PLN: 'PLN ' };
-const REGION_LABEL = { uk: 'UK', europe: 'Europe', us: 'US', other: 'Other' };
+const SYM = { USD: '$', GBP: '£', EUR: '€', CHF: 'CHF ', SEK: 'SEK ', NOK: 'NOK ', DKK: 'DKK ', PLN: 'PLN ', ILS: '₪' };
+const REGION_LABEL = { uk: 'UK', europe: 'Europe', us: 'US', other: 'Elsewhere' };
+
+// Two audiences: anyone reading the list, and whoever is checking the pipeline.
+// Confirmation, disputes and the reasons a round sits outside the brief are working
+// notes, so they are behind ?control=1 rather than on the page by default.
+const params = new URLSearchParams(location.search);
+let control = params.get('control') === '1';
+try { control = control || localStorage.getItem('fr-control') === '1'; } catch (e) {}
+
 const state = { q: '', sort: 'date', regions: new Set(), stages: new Set(),
                 brief: true, confirmed: false, ai: false, hideStudios: false, minAmount: 0 };
 
@@ -126,44 +154,59 @@ function money(r) {
   const sym = SYM[r.currency] || (r.currency ? r.currency + ' ' : '');
   const n = r.amount >= 1e9 ? (r.amount / 1e9).toFixed(1).replace(/\.0$/, '') + 'B'
           : r.amount >= 1e6 ? (r.amount / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
-          : (r.amount / 1e3).toFixed(0) + 'K';
+          : Math.round(r.amount / 1e3) + 'K';
   return sym + n;
 }
 function when(iso) {
   if (!iso) return '';
   const d = new Date(iso), days = Math.floor((Date.now() - d) / 86400000);
   const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  if (days <= 0) return 'today · ' + label;
-  if (days === 1) return 'yesterday · ' + label;
-  if (days < 30) return days + ' days ago · ' + label;
-  return label + ' ' + d.getFullYear();
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 14) return days + ' days ago';
+  return label + (d.getFullYear() === new Date().getFullYear() ? '' : ' ' + d.getFullYear());
 }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
-function toggles(host, values, key, labels) {
+// Chips carry their count, and a chip that can only ever return nothing is not
+// shown: all the in-brief rounds are European, so an empty "US" chip just reads
+// as a filter that does not work.
+function facetOf(r, key) { return key === 'regions' ? (r.region || 'other') : (r.stage || 'unstated'); }
+
+function drawFacets(host, values, key, labels) {
+  const counts = new Map(values.map(v => [v, 0]));
+  ROUNDS.filter(r => matches(r, key)).forEach(r => {
+    const value = facetOf(r, key);
+    if (counts.has(value)) counts.set(value, counts.get(value) + 1);
+  });
   host.innerHTML = '';
   values.forEach(value => {
+    const selected = state[key].has(value);
+    const n = counts.get(value) || 0;
+    if (!n && !selected) return;
     const b = document.createElement('button');
-    b.className = 'chip'; b.type = 'button'; b.setAttribute('aria-pressed', 'false');
-    b.textContent = labels ? (labels[value] || value) : value;
+    b.className = 'chip'; b.type = 'button';
+    b.setAttribute('aria-pressed', String(selected));
+    b.innerHTML = `${esc((labels && labels[value]) || value)} <span class="n">${n}</span>`;
     b.onclick = () => {
-      const on = b.getAttribute('aria-pressed') === 'true';
-      b.setAttribute('aria-pressed', String(!on));
-      on ? state[key].delete(value) : state[key].add(value);
+      if (selected) state[key].delete(value); else state[key].add(value);
       render();
     };
     host.appendChild(b);
   });
+  if (!host.children.length) host.innerHTML = '<span class="none">nothing here yet</span>';
 }
 
-function matches(r) {
-  if (state.brief && !r.qualified) return false;
-  if (state.confirmed && !r.confirmed) return false;
+function matches(r, ignore) {
+  // Outside the brief is a working distinction, so the list only ever shows
+  // in-brief rounds unless the control view is on and the toggle is released.
+  if (!control || state.brief) { if (!r.qualified) return false; }
+  if (control && state.confirmed && !r.confirmed) return false;
   if (state.ai && !r.ai_native) return false;
   if (state.hideStudios && r.is_studio) return false;
-  if (state.minAmount && !(r.amount_usd >= state.minAmount)) return false;
-  if (state.regions.size && !state.regions.has(r.region || 'other')) return false;
-  if (state.stages.size && !state.stages.has(r.stage || 'unstated')) return false;
+  if (state.minAmount && !(Number(r.amount_usd) >= state.minAmount)) return false;
+  if (ignore !== 'regions' && state.regions.size && !state.regions.has(r.region || 'other')) return false;
+  if (ignore !== 'stages' && state.stages.size && !state.stages.has(r.stage || 'unstated')) return false;
   if (state.q) {
     const hay = [r.company, r.summary, r.sector, r.hq, (r.investors || []).join(' '),
                  (r.sources || []).map(s => s.outlet).join(' ')].join(' ').toLowerCase();
@@ -173,19 +216,27 @@ function matches(r) {
 }
 
 function card(r) {
-  const badges = [];
-  if (r.confirmed) badges.push('<span class="badge ok">confirmed</span>');
-  else badges.push('<span class="badge">unconfirmed</span>');
-  if (r.ai_native) badges.push('<span class="badge">AI-native</span>');
-  if (r.is_studio) badges.push('<span class="badge">venture studio</span>');
-  if (r.disputed) badges.push('<span class="badge warn">outlets disagree on the amount</span>');
-  if (!r.qualified && r.qualified_reason) badges.push(`<span class="badge out">${esc(r.qualified_reason)}</span>`);
-  const name = r.domain ? `<a href="https://${esc(r.domain)}" target="_blank" rel="noopener">${esc(r.company)}</a>` : esc(r.company);
+  const tags = [];
+  if (r.ai_native) tags.push('<span class="tag">AI-native</span>');
+  if (r.is_studio) tags.push('<span class="tag">venture studio</span>');
+  if (control) {
+    tags.push(`<span class="tag">${r.confirmed ? 'confirmed' : 'unconfirmed'}</span>`);
+    if (r.disputed) tags.push('<span class="tag flag">outlets disagree on the amount</span>');
+    if (!r.qualified && r.qualified_reason) tags.push(`<span class="tag flag">${esc(r.qualified_reason)}</span>`);
+  }
+  const name = r.domain
+    ? `<a href="https://${esc(r.domain)}" target="_blank" rel="noopener">${esc(r.company)}</a>`
+    : esc(r.company);
   const facts = [r.sector, r.hq || REGION_LABEL[r.region] || r.region].filter(Boolean).map(esc).join(' · ');
-  const investors = (r.investors || []).length ? `<div class="meta">Investors: <b>${r.investors.map(esc).join(', ')}</b></div>` : '';
-  const sources = (r.sources || []).map(s =>
-    `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.outlet || 'source')}</a> — ${esc(s.title)}</li>`).join('');
-  return `<article class="card${r.qualified ? '' : ' out'}">
+  const investors = (r.investors || []).length
+    ? `<div class="meta">Backed by <b>${r.investors.map(esc).join(', ')}</b></div>` : '';
+  // Four publishers is plenty to prove a round; the rest are on the control view.
+  const all = (r.sources || []).filter(s => s.url);
+  const shown = control ? all : all.slice(0, 4);
+  const links = shown.map(s =>
+    `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.outlet || 'the article')}</a>`).join('')
+    + (all.length > shown.length ? `<span class="more">+${all.length - shown.length} more</span>` : '');
+  return `<article class="card">
     <div class="head">
       <span class="name">${name}</span>
       <span class="amount">${money(r)}</span>
@@ -195,32 +246,38 @@ function card(r) {
     ${r.summary ? `<p class="summary">${esc(r.summary)}</p>` : ''}
     ${facts ? `<div class="meta">${facts}</div>` : ''}
     ${investors}
-    <div class="badges">${badges.join('')}</div>
-    <details>
-      <summary>${(r.sources || []).length} source${(r.sources || []).length === 1 ? '' : 's'}</summary>
-      ${r.evidence ? `<blockquote>${esc(r.evidence)}</blockquote>` : ''}
-      <ul class="srcs">${sources}</ul>
-    </details>
+    ${tags.length ? `<div class="tags">${tags.join('')}</div>` : ''}
+    ${links ? `<div class="read"><span>Read it at</span> ${links}</div>` : ''}
+    ${control && r.evidence ? `<blockquote>${esc(r.evidence)}</blockquote>` : ''}
   </article>`;
 }
 
 function render() {
-  const rows = ROUNDS.filter(matches).sort((a, b) => state.sort === 'amount'
-    ? (b.amount_usd || 0) - (a.amount_usd || 0)
+  drawFacets(document.getElementById('regions'), DATA.meta.regions, 'regions', REGION_LABEL);
+  drawFacets(document.getElementById('stages'), DATA.meta.stages, 'stages');
+  const rows = ROUNDS.filter(r => matches(r)).sort((a, b) => state.sort === 'amount'
+    ? (Number(b.amount_usd) || 0) - (Number(a.amount_usd) || 0)
     : String(b.date || '').localeCompare(String(a.date || '')));
   document.getElementById('list').innerHTML = rows.length
     ? rows.map(card).join('')
     : '<p class="empty">Nothing matches these filters.</p>';
+  const pool = control ? ROUNDS.length : ROUNDS.filter(r => r.qualified).length;
   document.getElementById('count').textContent =
-    `${rows.length} of ${ROUNDS.length} round${ROUNDS.length === 1 ? '' : 's'}`;
+    rows.length === pool ? `${rows.length} rounds` : `${rows.length} of ${pool} rounds`;
 }
 
-document.getElementById('subtitle').textContent =
-  `${DATA.meta.window_days}-day window · ${DATA.meta.total} rounds · ${DATA.meta.qualified} in brief · built ${when(DATA.meta.generated_at)}`;
-document.getElementById('footer').textContent =
-  `Sources: ${DATA.meta.outlets} outlets. Amounts are as reported by the outlet; size filters use a rough USD equivalent.`;
-toggles(document.getElementById('regions'), DATA.meta.regions, 'regions', REGION_LABEL);
-toggles(document.getElementById('stages'), DATA.meta.stages, 'stages');
+function applyMode() {
+  document.querySelectorAll('.ctrl').forEach(el => { el.hidden = !control; });
+  document.getElementById('mode').textContent = control ? 'Hide working notes' : 'Working notes';
+  const shown = control ? ROUNDS.length : ROUNDS.filter(r => r.qualified).length;
+  document.getElementById('subtitle').textContent =
+    `${shown} rounds raised in the last ${DATA.meta.window_days} days · updated ${when(DATA.meta.generated_at)}`;
+  document.getElementById('footnote').textContent = control
+    ? `${DATA.meta.total} rounds held, ${DATA.meta.qualified} in brief, ${DATA.meta.confirmed} confirmed, from ${DATA.meta.outlets} outlets. Amounts as reported; size filters use a rough USD equivalent.`
+    : `Amounts are as reported by the outlet linked on each round.`;
+  render();
+}
+
 document.getElementById('q').oninput = e => { state.q = e.target.value.trim().toLowerCase(); render(); };
 document.getElementById('sort').onchange = e => { state.sort = e.target.value; render(); };
 document.getElementById('minamt').onchange = e => { state.minAmount = Number(e.target.value); render(); };
@@ -228,7 +285,12 @@ document.getElementById('minamt').onchange = e => { state.minAmount = Number(e.t
   const b = document.getElementById(id);
   b.onclick = () => { state[key] = !state[key]; b.setAttribute('aria-pressed', String(state[key])); render(); };
 });
-render();
+document.getElementById('mode').onclick = () => {
+  control = !control;
+  try { localStorage.setItem('fr-control', control ? '1' : '0'); } catch (e) {}
+  applyMode();
+};
+applyMode();
 </script>
 </body>
 </html>
