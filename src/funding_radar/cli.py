@@ -25,6 +25,7 @@ def main() -> None:
     sub.add_parser("sources", help="Per-source health from the last run")
     sub.add_parser("recheck", help="Re-apply the rules to stored rounds (no model calls)")
     sub.add_parser("dedupe", help="Merge companies stored twice under two names")
+    sub.add_parser("test-llm", help="Check the API key and model before a run spends on them")
 
     site_p = sub.add_parser("site", help="Build the static dashboard")
     site_p.add_argument("--days", type=int, default=120)
@@ -66,6 +67,16 @@ def main() -> None:
                   f"{(row['stage'] or '?'):<10} {amount:<17} {row['region']:<7} {row['sector'][:22]:<22} "
                   f"{investors[:34]}{outside}")
         print(f"\n{len(rounds)} round(s)")
+
+    elif args.command == "test-llm":
+        from src.funding_radar.llm import complete_json
+
+        settings.require_llm()
+        schema = {"type": "object", "properties": {"ok": {"type": "boolean"}},
+                  "required": ["ok"], "additionalProperties": False}
+        reply = complete_json("Answer with ok true.", "Are you reachable?", schema,
+                              model=settings.EXTRACT_MODEL, effort="low", max_tokens=100)
+        print(f"{settings.EXTRACT_MODEL} reachable: {reply}")
 
     elif args.command == "recheck":
         from src.funding_radar.pipeline import recheck

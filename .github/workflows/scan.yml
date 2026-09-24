@@ -1,0 +1,101 @@
+name: scan
+
+# Twice a day, 07:00 and 17:00 London. GitHub only speaks UTC, so both clock
+# times are scheduled in both offsets and the gate below drops the wrong one.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+    - cron: "0 7 * * *"
+    - cron: "0 16 * * *"
+    - cron: "0 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write      # the database branch
+  pages: write         # the published page
+  id-token: write      # deploying to Pages
+
+concurrency:
+  group: funding-radar-scan
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.check.outputs.go }}
+    steps:
+      - id: check
+        run: |
+          hour=$(TZ=Europe/London date +%H)
+          if [ "${{ github.event_name }}" != "schedule" ] || [ "$hour" = "07" ] || [ "$hour" = "17" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Skipping: it is ${hour}:00 in London, not 07 or 17."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  scan:
+    needs: gate
+    if: needs.gate.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # The database lives on its own branch, force-pushed as a single commit, so
+      # it persists between runs without the repository growing a copy per run.
+      - name: Restore the database
+        run: |
+          mkdir -p data
+          if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
+            git fetch --depth 1 origin data
+            git checkout FETCH_HEAD -- data/funding.db
+            echo "Restored $(du -h data/funding.db | cut -f1) database."
+          else
+            echo "No database branch yet; starting from empty."
+          fi
+
+      - name: Check the model is reachable before spending a run on it
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m src.funding_radar.cli test-llm
+
+      - name: Scan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python -m src.funding_radar.cli run
+          python -m src.funding_radar.cli dedupe
+          python -m src.funding_radar.cli site
+
+      - name: Source health
+        if: always()
+        run: python -m src.funding_radar.cli sources
+
+      - name: Save the database
+        run: |
+          git config user.name "funding-radar"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan data-branch
+          git rm -r --cached . >/dev/null
+          git add -f data/funding.db
+          git commit -q -m "Database after the run of $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -f origin data-branch:data
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
