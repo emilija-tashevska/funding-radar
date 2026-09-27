@@ -359,3 +359,26 @@ def test_an_old_database_file_gains_the_new_columns(tmp_path):
         assert company["description"] == "" and company["is_studio"] == 0
         columns = {r[1] for r in upgraded._conn.execute("PRAGMA table_info(round_sources)")}
         assert "resolved_url" in columns
+
+
+# ---- a vaguer, later report never demotes what we hold ---------------------
+
+def test_a_later_report_without_a_location_keeps_the_known_region(db):
+    company = db.upsert_company(_round(company_domain="", region="europe", sector="Fintech and payments"))
+    db.upsert_company(_round(company_domain="", region="other", sector="Other"))
+    kept = db.get_company(company)
+    assert (kept["region"], kept["sector"]) == ("europe", "Fintech and payments")
+
+
+def test_a_specific_later_report_still_corrects_the_region(db):
+    company = db.upsert_company(_round(company_domain="", region="other", sector="Other"))
+    db.upsert_company(_round(company_domain="", region="uk", sector="AI applications"))
+    kept = db.get_company(company)
+    assert (kept["region"], kept["sector"]) == ("uk", "AI applications")
+
+
+def test_a_fallback_still_fills_an_empty_region(db):
+    company = db.upsert_company(_round(company_domain="", region="", sector=""))
+    db.upsert_company(_round(company_domain="", region="other", sector="Other"))
+    kept = db.get_company(company)
+    assert (kept["region"], kept["sector"]) == ("other", "Other")
