@@ -162,3 +162,28 @@ def test_operating_companies_are_not_mistaken_for_funds(text):
     assert not discovery.looks_like_fund_raise(text)
     assert discovery.looks_like_funding(text)
 
+
+
+def test_web_search_is_off_unless_switched_on(monkeypatch):
+    calls = []
+    monkeypatch.setattr(discovery, "search_anthropic", lambda *a, **k: calls.append(a))
+    assert discovery._web_searches({"enabled": False, "queries": ["q"]}) == []
+    assert calls == []
+
+
+def test_web_search_runs_each_query_once_when_on(monkeypatch):
+    from src.funding_radar.sources.web_search import SearchCost
+
+    queries = []
+    monkeypatch.setattr(discovery.settings, "ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(discovery, "search_anthropic", lambda query, **k: (
+        queries.append(query) or SourceResult(f"Anthropic search: {query}", "web_search", []),
+        SearchCost(searches=1, usd=0.04)))
+    results = discovery._web_searches({"enabled": True, "queries": ["a", "b"], "fund_queries": ["c"]})
+    assert queries == ["a", "b", "c"] and len(results) == 3
+
+
+def test_web_search_needs_a_key(monkeypatch):
+    monkeypatch.setattr(discovery.settings, "ANTHROPIC_API_KEY", "")
+    monkeypatch.setattr(discovery, "search_anthropic", lambda *a, **k: pytest.fail("called without a key"))
+    assert discovery._web_searches({"enabled": True, "queries": ["a"]}) == []

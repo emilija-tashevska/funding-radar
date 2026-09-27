@@ -120,3 +120,26 @@ def test_the_artifact_copy_drops_the_skeleton_and_keeps_the_page(tmp_path, db):
     assert "<!doctype html>" not in hosted and "<body>" not in hosted
     assert "<title>Funding Radar</title>" in hosted and "Acme AI" in hosted
     assert hosted.count("<script") == 2
+
+
+@pytest.mark.parametrize("investors,expected", [
+    (["Antler"], ["Antler"]),
+    (["Antler Elevate", "Index Ventures"], ["Antler"]),
+    (["Entrepreneur First (EF)"], ["Entrepreneur First"]),
+    (["Techstars London"], ["Techstars"]),
+    (["Pantler Capital"], []),            # whole words only
+    (["Index Ventures"], []),
+    ([], []),
+])
+def test_followed_funds_are_matched_by_whole_words(investors, expected):
+    funds = ["Antler", "Entrepreneur First", "Creandum", "Techstars"]
+    assert site.followed_funds_in(investors, funds) == expected
+
+
+def test_the_payload_marks_rounds_backed_by_a_followed_fund(db):
+    _store(db, Round(company="Tiny", company_domain="tiny.ai", stage="pre-seed", amount_value=500_000,
+                     currency="GBP", region="uk", investors=["Antler"], round_date="2026-09-20"),
+           _article("Tiny raises £500k", "https://tc.test/tiny"))
+    payload = site.build_payload(db, window_days=3650, followed_funds=["Antler", "Techstars"])
+    assert payload["rounds"][0]["followed"] == ["Antler"]
+    assert payload["meta"]["followed_funds"] == ["Antler", "Techstars"]

@@ -36,6 +36,7 @@ from src.funding_radar.qualify import Rules, qualifies  # noqa: E402
 from src.funding_radar.settings import settings  # noqa: E402
 from src.funding_radar.sources.base import headline_key, load_config  # noqa: E402
 from src.funding_radar.sources import web_search as ws  # noqa: E402
+from src.funding_radar.sources.feeds import fetch_google_news  # noqa: E402
 
 BLOCKED_PUBLISHERS = ("finsmes.com", "atomico.com", "speedinvest.com")
 RECENT_DAYS = 10
@@ -73,6 +74,10 @@ def run_provider(provider: str, queries: list[str], conf: dict) -> tuple[list, w
             result, spent = ws.search_anthropic(query, model=settings.EXTRACT_MODEL,
                                                 api_key=settings.ANTHROPIC_API_KEY,
                                                 country=conf.get("country", "GB"))
+        elif provider == "google_news":
+            google = load_config().get("google_news", {})
+            result = fetch_google_news(query, google.get("locale", {}), google.get("window", "when:3d"))
+            spent = ws.SearchCost(searches=1)
         elif provider == "tavily":
             result, spent = ws.search_tavily(query, api_key=os.environ["TAVILY_API_KEY"],
                                              days=int(conf.get("days", 3)))
@@ -90,17 +95,21 @@ def run_provider(provider: str, queries: list[str], conf: dict) -> tuple[list, w
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default="probe_report.json")
+    parser.add_argument("--set", default="queries", choices=["queries", "fund_queries"],
+                        help="general UK queries, or the tracked-fund queries")
+    parser.add_argument("--skip-composition", action="store_true")
     args = parser.parse_args()
 
     config = load_config()
     conf = config.get("web_search", {})
-    queries = conf.get("queries", [])
+    queries = conf.get(args.set, [])
     rules = Rules.from_config(config)
-    keys = {"anthropic": settings.ANTHROPIC_API_KEY, "tavily": os.getenv("TAVILY_API_KEY", ""),
+    # Google News needs no key and costs nothing: the free baseline to beat.
+    keys = {"anthropic": settings.ANTHROPIC_API_KEY, "google_news": "free", "tavily": os.getenv("TAVILY_API_KEY", ""),
             "openai": os.getenv("OPENAI_API_KEY", "")}
-    report: dict = {"queries": queries, "providers": {}, "skipped": [p for p, k in keys.items() if not k]}
+    report: dict = {"query_set": args.set, "queries": queries, "providers": {}, "skipped": [p for p, k in keys.items() if not k]}
 
-    if keys["anthropic"]:
+    if keys["anthropic"] and not args.skip_composition:
         report["anthropic_search_with_structured_output"] = composition_test(
             settings.EXTRACT_MODEL, keys["anthropic"])
 
@@ -126,6 +135,21 @@ def main() -> int:
     if fundingish and keys["anthropic"]:
         results, extract_stats = extract([Candidate(article=a) for a in fundingish], config.get("sectors", []))
     report["extraction"] = extract_stats
+    # Why each funding-like article did or did not become a round, to read by eye.
+    decisions = []
+    for index, article in enumerate(fundingish):
+        result = results.get(index, "not extracted")
+        if isinstance(result, Round):
+            verdict = qualifies(result, rules)
+            outcome = (f"ROUND {result.company} | {result.amount_value} {result.currency} "
+                       f"{result.stage or 'stage?'} | {result.region or 'region?'} | "
+                       f"{'in brief' if verdict.qualified else verdict.reason}")
+        else:
+            outcome = f"rejected: {result}"
+        decisions.append({"title": article.title, "url": article.url,
+                          "published": article.published_at, "has_snippet": bool(article.summary),
+                          "outcome": outcome})
+    report["decisions"] = decisions
 
     with FundingDatabase(settings.DATABASE_PATH) as db:
         rounds_by_url = {}
@@ -176,7 +200,7 @@ def main() -> int:
 
 
 def render(report: dict) -> str:
-    lines = ["## Search probe", ""]
+    lines = [f"## Search probe: {report.get('query_set', 'queries')}", ""]
     comp = report.get("anthropic_search_with_structured_output")
     if comp:
         lines.append(f"Anthropic web search + structured outputs in one call: **{'works' if comp['works'] else 'fails'}**"
@@ -200,6 +224,13 @@ def render(report: dict) -> str:
             lines.append(f"\n{name} reached blocked publishers: {', '.join(entry['blocked_publisher_hits'])}")
         for r in entry.get("new_uk_rounds", []):
             lines.append(f"- {name}: {r['company']} — {r['amount']} {r['currency']} {r['stage']} ({r['hq']})")
+    if report.get("extraction"):
+        lines.append(f"\nExtraction: {report['extraction']}")
+    if report.get("decisions"):
+        lines += ["", "| funding-like article | snippet | outcome |", "|---|---|---|"]
+        for d in report["decisions"]:
+            lines.append(f"| {d['title'][:90].replace('|', '/')} | {'yes' if d['has_snippet'] else 'no'} "
+                         f"| {d['outcome'][:140].replace('|', '/')} |")
     return "\n".join(lines)
 
 

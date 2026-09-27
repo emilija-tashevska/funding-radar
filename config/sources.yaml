@@ -75,6 +75,10 @@ rss:
   - {name: The Recursive, url: "https://therecursive.com/feed/"}
   - {name: Sifted Funding, url: "https://sifted.eu/sector/funding/feed"}
   - {name: Maddyness UK, url: "https://www.maddyness.com/uk/feed/"}
+  # Verified from the runner by scripts/verify_sources.py on 2026-09-27: 10 items
+  # each, current, with UK funding stories (Basecamp Research, OneClickComply).
+  - {name: Business Cloud, url: "https://www.businesscloud.co.uk/feed/"}
+  - {name: FinTech Global, url: "https://fintech.global/feed/"}
   # Funds with a real feed. Mostly essays, but investment announcements appear here too.
   - {name: Balderton (feed), url: "https://www.balderton.com/feed/"}
   - {name: Seedcamp (feed), url: "https://seedcamp.com/feed/"}
@@ -105,7 +109,13 @@ google_news:
     - '"raises" million startup Britain OR Ireland OR Netherlands OR Germany OR France'
     - '"raises" million startup Spain OR Italy OR Sweden OR Denmark OR Portugal OR Poland'
     - '"venture debt" OR "growth round" OR "extension round" startup Europe raises'
-    - 'European startup "funding round" led by investors' 
+    - 'European startup "funding round" led by investors'
+    # The tracked funds' own sites do not announce portfolio rounds (checked from
+    # the runner on 2026-09-27), so their companies are found through the press.
+    - '"Antler" startup raises (seed OR "pre-seed")'
+    - '"Entrepreneur First" startup raises (seed OR "pre-seed")'
+    - '"Creandum" raises (seed OR "Series A")'
+    - '"Techstars" startup raises seed'
   # Rounds reported only in the local language never reach the English feeds.
   extra_locales:
     - {hl: "de", gl: "DE", ceid: "DE:de", query: 'startup "Millionen" Finanzierungsrunde'}
@@ -160,3 +170,10 @@ web_search:
     - British startup secures Series B investment
     - startup raises funding Manchester OR Edinburgh OR Bristol OR Cambridge OR Leeds
     - Finsmes UK company funding round
+  # The same four funds through web search, to compare with the free Google News
+  # queries above before paying for them in the scan.
+  fund_queries:
+    - Antler backed startup raises seed or pre-seed round
+    - Entrepreneur First founded startup raises seed round
+    - Creandum leads seed round
+    - Techstars alumni startup raises seed round

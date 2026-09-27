@@ -7,12 +7,15 @@ one obvious place to encrypt later when the passphrase goes on.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from src.funding_radar.db import FundingDatabase
+from src.funding_radar.models import normalize_company
 from src.funding_radar.qualify import approx_usd
 from src.funding_radar.settings import PROJECT_ROOT, settings
+from src.funding_radar.sources.base import load_config
 
 TEMPLATE = PROJECT_ROOT / "templates" / "index.html"
 PLACEHOLDER = "__DATA__"
@@ -20,7 +23,22 @@ STAGE_ORDER = ["pre-seed", "seed", "series a", "series b", "series c", "series d
 REGION_ORDER = ["uk", "europe", "us", "other"]
 
 
-def _round_payload(row: dict) -> dict:
+def followed_funds_in(investors: list[str], funds: list[str]) -> list[str]:
+    """Which of the owner's followed funds backed this round, by whole words.
+
+    Outlets name the same fund loosely ("Antler Elevate", "Entrepreneur First (EF)"),
+    so a fund counts when its name appears as whole words in an investor's name.
+    """
+    found = []
+    for fund in funds:
+        key = normalize_company(fund)
+        pattern = re.compile(rf"\b{re.escape(key)}\b")
+        if key and any(pattern.search(normalize_company(name)) for name in investors):
+            found.append(fund)
+    return found
+
+
+def _round_payload(row: dict, funds: list[str] = ()) -> dict:
     return {
         "id": row["round_id"],
         "company": row["company"],
@@ -41,6 +59,7 @@ def _round_payload(row: dict) -> dict:
         "qualified": bool(row.get("qualified")),
         "qualified_reason": row.get("qualified_reason") or "",
         "investors": row.get("investors") or [],
+        "followed": followed_funds_in(row.get("investors") or [], list(funds)),
         "evidence": row.get("evidence") or "",
         "sources": _sources(row.get("sources") or []),
     }
@@ -72,9 +91,12 @@ def _sources(rows: list[dict]) -> list[dict]:
     return unique
 
 
-def build_payload(db: FundingDatabase, *, window_days: int = 120) -> dict:
+def build_payload(db: FundingDatabase, *, window_days: int = 120,
+                  followed_funds: list[str] | None = None) -> dict:
+    if followed_funds is None:
+        followed_funds = (load_config().get("filters", {}) or {}).get("tracked_investors") or []
     rows = db.list_rounds(window_days=window_days, qualified_only=False)
-    rounds = [_round_payload(row) for row in rows]
+    rounds = [_round_payload(row, followed_funds) for row in rows]
     stages = [stage for stage in STAGE_ORDER
               if any((r["stage"] or "unstated") == stage for r in rounds)]
     regions = [region for region in REGION_ORDER if any(r["region"] == region for r in rounds)]
@@ -89,6 +111,7 @@ def build_payload(db: FundingDatabase, *, window_days: int = 120) -> dict:
             "outlets": len(outlets),
             "stages": stages,
             "regions": regions,
+            "followed_funds": list(followed_funds),
         },
         "rounds": rounds,
     }

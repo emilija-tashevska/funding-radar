@@ -109,13 +109,22 @@ footer button { font: inherit; font-size: 12px; background: none; border: 0; col
       <span class="label">Filter</span>
       <span class="group">
         <select id="minamt" aria-label="Minimum size">
-          <option value="0">Any size</option>
+          <option value="0">No minimum</option>
           <option value="1000000">1M+</option>
           <option value="2000000">2M+</option>
           <option value="5000000">5M+</option>
           <option value="10000000">10M+</option>
           <option value="25000000">25M+</option>
         </select>
+        <select id="maxamt" aria-label="Maximum size">
+          <option value="0">No upper limit</option>
+          <option value="1000000">Up to 1M</option>
+          <option value="2000000">Up to 2M</option>
+          <option value="5000000">Up to 5M</option>
+          <option value="10000000">Up to 10M</option>
+          <option value="25000000">Up to 25M</option>
+        </select>
+        <button class="chip" id="f-followed" aria-pressed="false">Funds I follow</button>
         <button class="chip" id="f-ai" aria-pressed="false">AI-native</button>
         <button class="chip" id="f-studio" aria-pressed="false">Hide studios</button>
         <button class="chip ctrl" id="f-brief" aria-pressed="true" hidden>In brief only</button>
@@ -147,7 +156,8 @@ let control = params.get('control') === '1';
 try { control = control || localStorage.getItem('fr-control') === '1'; } catch (e) {}
 
 const state = { q: '', sort: 'date', regions: new Set(), stages: new Set(),
-                brief: true, confirmed: false, ai: false, hideStudios: false, minAmount: 0 };
+                brief: true, confirmed: false, ai: false, hideStudios: false, minAmount: 0, maxAmount: 0,
+                followed: false };
 
 function money(r) {
   if (!r.amount) return 'undisclosed';
@@ -203,8 +213,11 @@ function matches(r, ignore) {
   if (!control || state.brief) { if (!r.qualified) return false; }
   if (control && state.confirmed && !r.confirmed) return false;
   if (state.ai && !r.ai_native) return false;
+  if (state.followed && !(r.followed || []).length) return false;
   if (state.hideStudios && r.is_studio) return false;
   if (state.minAmount && !(Number(r.amount_usd) >= state.minAmount)) return false;
+  // An undisclosed amount is not "up to" anything, so a cap hides it too.
+  if (state.maxAmount && !(Number(r.amount_usd) > 0 && Number(r.amount_usd) <= state.maxAmount)) return false;
   if (ignore !== 'regions' && state.regions.size && !state.regions.has(r.region || 'other')) return false;
   if (ignore !== 'stages' && state.stages.size && !state.stages.has(r.stage || 'unstated')) return false;
   if (state.q) {
@@ -217,6 +230,7 @@ function matches(r, ignore) {
 
 function card(r) {
   const tags = [];
+  (r.followed || []).forEach(f => tags.push(`<span class="tag">${esc(f)}-backed</span>`));
   if (r.ai_native) tags.push('<span class="tag">AI-native</span>');
   if (r.is_studio) tags.push('<span class="tag">venture studio</span>');
   if (control) {
@@ -281,7 +295,8 @@ function applyMode() {
 document.getElementById('q').oninput = e => { state.q = e.target.value.trim().toLowerCase(); render(); };
 document.getElementById('sort').onchange = e => { state.sort = e.target.value; render(); };
 document.getElementById('minamt').onchange = e => { state.minAmount = Number(e.target.value); render(); };
-[['f-brief', 'brief'], ['f-confirmed', 'confirmed'], ['f-ai', 'ai'], ['f-studio', 'hideStudios']].forEach(([id, key]) => {
+document.getElementById('maxamt').onchange = e => { state.maxAmount = Number(e.target.value); render(); };
+[['f-brief', 'brief'], ['f-confirmed', 'confirmed'], ['f-followed', 'followed'], ['f-ai', 'ai'], ['f-studio', 'hideStudios']].forEach(([id, key]) => {
   const b = document.getElementById(id);
   b.onclick = () => { state[key] = !state[key]; b.setAttribute('aria-pressed', String(state[key])); render(); };
 });

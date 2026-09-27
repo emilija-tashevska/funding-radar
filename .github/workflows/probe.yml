@@ -60,7 +60,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then echo "ANTHROPIC_API_KEY is not visible to this job."; fi
-          python scripts/search_probe.py
+          python scripts/search_probe.py --out probe_general.json
+          python scripts/search_probe.py --set fund_queries --skip-composition --out probe_funds.json
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -68,4 +69,5 @@ jobs:
           name: probe-reports
           path: |
             verify_report.json
-            probe_report.json
+            probe_general.json
+            probe_funds.json
