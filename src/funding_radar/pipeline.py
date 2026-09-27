@@ -14,7 +14,7 @@ from src.funding_radar.db import FundingDatabase
 from src.funding_radar.discovery import discover
 from src.funding_radar.extract import extract
 from src.funding_radar.models import Round
-from src.funding_radar.qualify import Rules, comparable_usd, is_confirmed, qualifies
+from src.funding_radar.qualify import Rules, approx_usd, comparable_usd, is_confirmed, qualifies
 from src.funding_radar.settings import settings
 from src.funding_radar.sources.base import company_hint, headline_key, load_config
 
@@ -25,10 +25,12 @@ AMOUNT_DISAGREEMENT = 0.2
 
 
 def register_tracked_investors(db: FundingDatabase, config: dict) -> None:
-    """Investors named in config get their per-fund size floor stored alongside them."""
-    floors = (config.get("filters", {}) or {}).get("investor_floors") or {}
-    for name, floor in floors.items():
+    """Investors named in config are tracked, with their own size floor when they have one."""
+    filters = config.get("filters", {}) or {}
+    for name, floor in (filters.get("investor_floors") or {}).items():
         db.upsert_investor(name, tracked=True, min_amount=float(floor))
+    for name in filters.get("tracked_investors") or []:
+        db.upsert_investor(name, tracked=True)
     for page in config.get("vc_pages", []):
         db.upsert_investor(page["name"], tracked=True)
 
@@ -140,8 +142,11 @@ def recheck(db: FundingDatabase, config: dict | None = None) -> dict:
         changed["qualified_changed"] += int(bool(row["qualified"]) != verdict.qualified)
         changed["confirmed_changed"] += int(bool(row["confirmed"]) != confirmed)
         changed["disputed_changed"] += int(bool(row["amount_disputed"]) != disputed)
+        # amount_usd is derived from amount and currency; refilled here so the stored
+        # column never drifts from the figure it came from.
         db.set_round_flags(row["round_id"], confirmed=confirmed, amount_disputed=disputed,
-                           qualified=verdict.qualified, qualified_reason=verdict.reason)
+                           qualified=verdict.qualified, qualified_reason=verdict.reason,
+                           amount_usd=approx_usd(row["amount_value"], row["currency"] or "USD") or 0.0)
     return changed
 
 

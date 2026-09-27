@@ -1,6 +1,7 @@
 import pytest
 
 from src.funding_radar.models import Round
+from src.funding_radar.sources.base import load_config
 from src.funding_radar.qualify import Rules, approx_usd, is_confirmed, normalize_stage, qualifies
 
 CONFIG = {
@@ -113,3 +114,27 @@ def test_ordinary_companies_are_not_mistaken_for_studios():
     assert not looks_like_studio("Metris Energy", "AI platform for renewable energy assets")
     assert not looks_like_studio("Pitch Black", "A game studio making multiplayer titles")
     assert not looks_like_studio("Form", "A design studio for consumer brands")
+
+
+# The brief as it stands in config: no size floor.
+LIVE_RULES = Rules.from_config(load_config())
+
+
+def test_the_live_brief_has_no_size_floor():
+    assert LIVE_RULES.min_amount == 0
+    assert LIVE_RULES.investor_floors == {}
+
+
+@pytest.mark.parametrize("amount", [150_000, 400_000, 1_900_000, 40_000_000])
+def test_any_size_of_round_qualifies_under_the_live_brief(amount):
+    assert qualifies(_round(stage="seed", amount_value=amount), LIVE_RULES).qualified
+
+
+def test_region_and_stage_still_apply_without_a_floor():
+    assert not qualifies(_round(region="us", amount_value=150_000), LIVE_RULES).qualified
+    assert not qualifies(_round(stage="Series C", amount_value=150_000), LIVE_RULES).qualified
+
+
+def test_a_reported_zero_is_read_as_undisclosed():
+    verdict = qualifies(_round(amount_value=0), RULES)
+    assert verdict.qualified and verdict.reason == "amount undisclosed"

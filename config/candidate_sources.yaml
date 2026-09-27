@@ -1,0 +1,34 @@
+# Candidates, NOT sources. scripts/verify_sources.py fetches each one from GitHub's
+# runner (where the scan runs) and reports whether it answers, how many items it
+# has, how recent they are and how many read like funding rounds. Only the ones that
+# pass go into sources.yaml. These URLs are guesses until the runner says otherwise.
+
+rss:
+  # UK outlets
+  - {name: Tech Funding News, url: "https://techfundingnews.com/feed/"}
+  - {name: Business Cloud, url: "https://www.businesscloud.co.uk/feed/"}
+  - {name: FinTech Global, url: "https://fintech.global/feed/"}
+  - {name: FF News, url: "https://ffnews.com/feed/"}
+  - {name: AltFi, url: "https://www.altfi.com/feed"}
+  - {name: Beauhurst, url: "https://www.beauhurst.com/feed/"}
+  - {name: TechRound, url: "https://techround.co.uk/feed/"}
+  - {name: Growth Business, url: "https://www.growthbusiness.co.uk/feed/"}
+  - {name: Prolific North, url: "https://www.prolificnorth.co.uk/feed/"}
+  - {name: Business Weekly (Cambridge), url: "https://www.businessweekly.co.uk/rss.xml"}
+  - {name: Insider Media, url: "https://www.insidermedia.com/rss"}
+  - {name: City AM, url: "https://www.cityam.com/feed/"}
+  - {name: IT Brief UK, url: "https://itbrief.co.uk/feed"}
+  # Tracked investors
+  - {name: Techstars (feed), url: "https://www.techstars.com/feed"}
+  # Blocked last time; rechecked here
+  - {name: Finsmes, url: "https://www.finsmes.com/feed"}
+
+pages:
+  - {name: Antler portfolio, url: "https://www.antler.co/portfolio"}
+  - {name: Antler news, url: "https://www.antler.co/news"}
+  - {name: Entrepreneur First posts, url: "https://www.joinef.com/posts/"}
+  - {name: Techstars newsroom, url: "https://www.techstars.com/newsroom"}
+  - {name: Techstars blog, url: "https://www.techstars.com/blog"}
+  - {name: LocalGlobe, url: "https://www.phoenixcourt.vc/news"}
+  - {name: Atomico, url: "https://atomico.com/insights"}
+  - {name: Speedinvest, url: "https://www.speedinvest.com/knowledge"}

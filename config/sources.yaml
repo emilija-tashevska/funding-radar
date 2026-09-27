@@ -2,16 +2,13 @@
 # near-zero is flagged rather than silently reducing coverage.
 
 filters:
-  # A round qualifies at 2M or more in any of these currencies, as reported.
-  # Other currencies are converted roughly, only to apply the cut-off.
-  min_amount: 2000000
+  # No size floor: every round raised in brief is included, whatever its size.
+  # (Was 2M with lower floors for Antler and EF; the owner removed it on 2026-09-27.)
+  # The floor mechanism still works if a value above 0 is set here again.
+  min_amount: 0
   min_amount_currencies: [USD, GBP, EUR]
-  # Company builders and pre-seed funds write much smaller first cheques, and their
-  # companies are the ones with no product leadership at all. Backing from one of
-  # these lowers the floor for that round.
-  investor_floors:
-    Antler: 300000
-    Entrepreneur First: 300000
+  # Funds whose portfolio we follow; stored as tracked in the investors table.
+  tracked_investors: [Antler, Entrepreneur First, Creandum, Techstars]
   stages: [pre-seed, seed, series a, series b]
   regions: [uk, europe]
   # Rounds stay on the site for this long.
@@ -78,6 +75,10 @@ rss:
   - {name: The Recursive, url: "https://therecursive.com/feed/"}
   - {name: Sifted Funding, url: "https://sifted.eu/sector/funding/feed"}
   - {name: Maddyness UK, url: "https://www.maddyness.com/uk/feed/"}
+  # Verified from the runner by scripts/verify_sources.py on 2026-09-27: 10 items
+  # each, current, with UK funding stories (Basecamp Research, OneClickComply).
+  - {name: Business Cloud, url: "https://www.businesscloud.co.uk/feed/"}
+  - {name: FinTech Global, url: "https://fintech.global/feed/"}
   # Funds with a real feed. Mostly essays, but investment announcements appear here too.
   - {name: Balderton (feed), url: "https://www.balderton.com/feed/"}
   - {name: Seedcamp (feed), url: "https://seedcamp.com/feed/"}
@@ -108,7 +109,13 @@ google_news:
     - '"raises" million startup Britain OR Ireland OR Netherlands OR Germany OR France'
     - '"raises" million startup Spain OR Italy OR Sweden OR Denmark OR Portugal OR Poland'
     - '"venture debt" OR "growth round" OR "extension round" startup Europe raises'
-    - 'European startup "funding round" led by investors' 
+    - 'European startup "funding round" led by investors'
+    # The tracked funds' own sites do not announce portfolio rounds (checked from
+    # the runner on 2026-09-27), so their companies are found through the press.
+    - '"Antler" startup raises (seed OR "pre-seed")'
+    - '"Entrepreneur First" startup raises (seed OR "pre-seed")'
+    - '"Creandum" raises (seed OR "Series A")'
+    - '"Techstars" startup raises seed'
   # Rounds reported only in the local language never reach the English feeds.
   extra_locales:
     - {hl: "de", gl: "DE", ceid: "DE:de", query: 'startup "Millionen" Finanzierungsrunde'}
@@ -148,3 +155,33 @@ vc_pages:
 # UK Companies House: verification and unannounced raises (needs COMPANIES_HOUSE_KEY).
 companies_house:
   enabled: false
+
+# One or two sentences per in-brief company, written from the article itself.
+# Runs after each scan (cli describe). When no article can be read, a web search
+# can stand in: $0.01 per search plus tokens, about $0.04 a company. Off until the
+# owner turns it on.
+describe:
+  web_search_fallback: false
+  max_searches: 20
+
+# Search APIs as a discovery source. Off in the scan until scripts/search_probe.py
+# has measured which provider finds new in-brief UK rounds for the money. Six
+# searches a run (the owner's budget), one search per query.
+web_search:
+  enabled: false
+  country: GB
+  days: 3
+  queries:
+    - UK startup raises seed round
+    - London startup raises Series A funding
+    - UK startup pre-seed funding announced
+    - British startup secures Series B investment
+    - startup raises funding Manchester OR Edinburgh OR Bristol OR Cambridge OR Leeds
+    - Finsmes UK company funding round
+  # The same four funds through web search, to compare with the free Google News
+  # queries above before paying for them in the scan.
+  fund_queries:
+    - Antler backed startup raises seed or pre-seed round
+    - Entrepreneur First founded startup raises seed round
+    - Creandum leads seed round
+    - Techstars alumni startup raises seed round

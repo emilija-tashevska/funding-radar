@@ -13,10 +13,12 @@ from datetime import datetime, timedelta, timezone
 
 from src.funding_radar.db import FundingDatabase
 from src.funding_radar.models import Article
+from src.funding_radar.settings import settings
 from src.funding_radar.sources.base import company_hint, headline_key, http_client, load_config
 from src.funding_radar.sources.feeds import fetch_google_news, fetch_rss
 from src.funding_radar.sources.gdelt import fetch_gdelt
 from src.funding_radar.sources.vc_pages import fetch_vc_page
+from src.funding_radar.sources.web_search import search_anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +138,28 @@ def _prefer_direct_link(candidate: Candidate) -> None:
         candidate.article = direct
 
 
+def _web_searches(conf: dict) -> list:
+    """Anthropic web search, when switched on: one search per configured query.
+
+    Paid per search, so it is off unless config says otherwise, and the spend is
+    logged each run.
+    """
+    if not conf.get("enabled"):
+        return []
+    if not settings.ANTHROPIC_API_KEY:
+        logger.warning("web_search is enabled but ANTHROPIC_API_KEY is not set; skipped")
+        return []
+    results, spent = [], 0.0
+    for query in [*conf.get("queries", []), *conf.get("fund_queries", [])]:
+        result, cost = search_anthropic(query, model=settings.EXTRACT_MODEL,
+                                        api_key=settings.ANTHROPIC_API_KEY,
+                                        country=conf.get("country", "GB"))
+        results.append(result)
+        spent += cost.usd
+    logger.info("Web search: %d searches, about $%.3f", len(results), spent)
+    return results
+
+
 def collect(config: dict, *, client=None) -> list:
     """Run every configured source once, returning one SourceResult each."""
     own_client = client is None
@@ -159,6 +183,8 @@ def collect(config: dict, *, client=None) -> list:
 
         for page in config.get("vc_pages", []):
             results.append(fetch_vc_page(page["name"], page["url"], client=client))
+
+        results.extend(_web_searches(config.get("web_search", {})))
     finally:
         if own_client:
             client.close()
