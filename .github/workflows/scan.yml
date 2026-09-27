@@ -59,7 +59,9 @@ jobs:
           mkdir -p data
           if git ls-remote --exit-code --heads origin data >/dev/null 2>&1; then
             git fetch --depth 1 origin data
-            git checkout FETCH_HEAD -- data/funding.db
+            # Write the file without staging it: a staged copy makes the save step's
+            # "git rm --cached" refuse, which failed the first run after the gate fix.
+            git show FETCH_HEAD:data/funding.db > data/funding.db
             echo "Restored $(du -h data/funding.db | cut -f1) database."
           else
             echo "No database branch yet; starting from empty."
