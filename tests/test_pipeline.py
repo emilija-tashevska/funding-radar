@@ -200,3 +200,11 @@ def test_recheck_reapplies_the_rules_without_calling_a_model(db):
     assert pipeline.recheck(db, {"filters": {"min_amount": wider.min_amount,
                                              "stages": list(wider.stages),
                                              "regions": list(wider.regions)}})["qualified_changed"] == 0
+
+
+def test_investors_listed_as_tracked_are_registered_without_a_floor(db):
+    pipeline.register_tracked_investors(
+        db, {"filters": {"tracked_investors": ["Techstars", "Antler"]}})
+    tracked = db.tracked_investors()
+    assert tracked["techstars"]["min_amount"] is None
+    assert "antler" in tracked

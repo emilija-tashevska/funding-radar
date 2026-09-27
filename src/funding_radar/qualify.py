@@ -1,9 +1,9 @@
 """Does this round belong on the list?
 
 Three questions, in cheap-to-expensive order: is it in a region we cover, at a
-stage we cover, and large enough. The size floor is per-investor: a company out of
-Antler or Entrepreneur First raises far less at the same point in its life, and is
-exactly the sort of company that needs fractional product help.
+stage we cover, and large enough. The brief currently has no size floor
+(min_amount 0), so the third question always passes; the per-investor floor
+mechanism is kept so a floor can be restored from config alone.
 """
 
 from __future__ import annotations
@@ -120,7 +120,8 @@ def qualifies(round_: Round, rules: Rules) -> Verdict:
 
     floor = rules.floor_for(round_.investors)
     amount = approx_usd(round_.amount_value, round_.currency)
-    if amount is None:
+    if not amount:
+        # A reported 0 is an undisclosed amount, not a zero-pound round.
         # An undisclosed amount at the right stage is still worth seeing; it stays
         # unconfirmed until a number appears.
         return Verdict(True, "amount undisclosed")

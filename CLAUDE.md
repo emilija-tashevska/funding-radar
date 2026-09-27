@@ -19,7 +19,7 @@ These were settled with the owner. Do not quietly change them.
 | Decision | Value |
 | --- | --- |
 | Stages | Seed to Series B |
-| Size floor | 2M, and $2M / £2M / €2M all count as the bar — deliberately no currency conversion for the floor |
+| Size floor | **None** (owner, 2026-09-27): every in-brief round is included whatever its size. Was 2M. `min_amount` in config still works if a floor is wanted back |
 | Regions | UK and Europe in brief; US and elsewhere stored and filterable, off by default |
 | Window | 120-day rolling history on the page |
 | Out-of-brief rounds | **Stored and labelled with the reason, never dropped.** The page filters them; the pipeline keeps them |
@@ -27,7 +27,7 @@ These were settled with the owner. Do not quietly change them.
 | Venture studios | Real rounds, flagged `is_studio`, filterable on the page |
 | Rounds whose headline names no company | Fetch the article body once and re-read before dropping |
 | Confirmation | Two tiers. Confirmed = amount + stage + (a resolved domain or two independent outlets). Unconfirmed rounds are shown; the owner is fine with that |
-| Tracked investors with lower floors | Antler and Entrepreneur First (300k). Creandum tracked. **Not Y Combinator** — explicitly excluded |
+| Tracked investors | Antler, Entrepreneur First, Creandum, Techstars (`tracked_investors` in config). The 300k lower floors went with the floor. **Not Y Combinator** — explicitly excluded |
 | Enrichment | None for the MVP |
 | Passphrase | Was in the original brief; the owner later chose a public page with no gate |
 
@@ -88,8 +88,9 @@ pytest -q                                    # 212 tests, all offline
 ## Operations
 
 - **Schedule:** `.github/workflows/scan.yml`, 07:00 and 17:00 London. Four crons
-  cover both UTC offsets and a gate job drops the wrong one, so it does not drift
-  when the clocks change.
+  cover both UTC offsets and `scripts/scan_gate.sh` drops the wrong one, judging by
+  **which cron fired**, not the clock. GitHub starts scheduled runs hours late; the
+  first gate read the clock and silently skipped every run from 25 to 27 September.
 - **Database:** `data/funding.db`, ~1 MB, persisted on the orphan `data` branch,
   force-pushed as a single commit per run so the repo never accumulates copies.
   Move to Turso if it reaches tens of MB.

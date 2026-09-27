@@ -2,16 +2,13 @@
 # near-zero is flagged rather than silently reducing coverage.
 
 filters:
-  # A round qualifies at 2M or more in any of these currencies, as reported.
-  # Other currencies are converted roughly, only to apply the cut-off.
-  min_amount: 2000000
+  # No size floor: every round raised in brief is included, whatever its size.
+  # (Was 2M with lower floors for Antler and EF; the owner removed it on 2026-09-27.)
+  # The floor mechanism still works if a value above 0 is set here again.
+  min_amount: 0
   min_amount_currencies: [USD, GBP, EUR]
-  # Company builders and pre-seed funds write much smaller first cheques, and their
-  # companies are the ones with no product leadership at all. Backing from one of
-  # these lowers the floor for that round.
-  investor_floors:
-    Antler: 300000
-    Entrepreneur First: 300000
+  # Funds whose portfolio we follow; stored as tracked in the investors table.
+  tracked_investors: [Antler, Entrepreneur First, Creandum, Techstars]
   stages: [pre-seed, seed, series a, series b]
   regions: [uk, europe]
   # Rounds stay on the site for this long.

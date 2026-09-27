@@ -25,10 +25,12 @@ AMOUNT_DISAGREEMENT = 0.2
 
 
 def register_tracked_investors(db: FundingDatabase, config: dict) -> None:
-    """Investors named in config get their per-fund size floor stored alongside them."""
-    floors = (config.get("filters", {}) or {}).get("investor_floors") or {}
-    for name, floor in floors.items():
+    """Investors named in config are tracked, with their own size floor when they have one."""
+    filters = config.get("filters", {}) or {}
+    for name, floor in (filters.get("investor_floors") or {}).items():
         db.upsert_investor(name, tracked=True, min_amount=float(floor))
+    for name in filters.get("tracked_investors") or []:
+        db.upsert_investor(name, tracked=True)
     for page in config.get("vc_pages", []):
         db.upsert_investor(page["name"], tracked=True)
 

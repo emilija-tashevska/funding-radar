@@ -25,15 +25,14 @@ jobs:
     outputs:
       go: ${{ steps.check.outputs.go }}
     steps:
+      - uses: actions/checkout@v4
+      # Decide from which cron fired, never from the clock: GitHub starts scheduled
+      # runs hours late, and a clock check skipped every run for three days.
       - id: check
-        run: |
-          hour=$(TZ=Europe/London date +%H)
-          if [ "${{ github.event_name }}" != "schedule" ] || [ "$hour" = "07" ] || [ "$hour" = "17" ]; then
-            echo "go=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Skipping: it is ${hour}:00 in London, not 07 or 17."
-            echo "go=false" >> "$GITHUB_OUTPUT"
-          fi
+        env:
+          EVENT: ${{ github.event_name }}
+          CRON: ${{ github.event.schedule }}
+        run: bash scripts/scan_gate.sh "$EVENT" "$CRON" "$(TZ=Europe/London date +%z)" >> "$GITHUB_OUTPUT"
 
   scan:
     needs: gate
@@ -76,6 +75,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           python -m src.funding_radar.cli run
+          python -m src.funding_radar.cli recheck
           python -m src.funding_radar.cli dedupe
           python -m src.funding_radar.cli site
 
