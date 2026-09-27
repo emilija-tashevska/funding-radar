@@ -140,3 +140,44 @@ def test_the_source_checker_counts_fresh_funding_items():
     assert row["last_14_days"] == 1 and row["newest"] == "2026-09-25"
     failed = module.assess(SourceResult("Y", "rss", [], error="403 Forbidden"), now=NOW)
     assert not failed["ok"]
+
+
+class _FakeResponse:
+    def __init__(self, text):
+        from types import SimpleNamespace as NS
+
+        self.content = [
+            {"type": "web_search_tool_result", "tool_use_id": "s", "content": [
+                {"type": "web_search_result", "title": "Acme — about", "url": "https://acme.test/about",
+                 "encrypted_content": "x", "page_age": None}]},
+            NS(type="text", text=text, citations=None),
+        ]
+        self.usage = {"input_tokens": 5000, "output_tokens": 100,
+                      "server_tool_use": {"web_search_requests": 1}}
+
+
+def _fake_anthropic(monkeypatch, text):
+    import anthropic
+
+    class Client:
+        def __init__(self, **kw):
+            self.messages = self
+
+        def create(self, **kw):
+            return _FakeResponse(text)
+
+    monkeypatch.setattr(anthropic, "Anthropic", Client)
+
+
+def test_a_search_description_keeps_a_url_the_search_returned(monkeypatch):
+    _fake_anthropic(monkeypatch, '{"description": "Acme makes rota software for clinics.", '
+                                 '"source_url": "https://acme.test/about"}')
+    text, url, cost = ws.describe_by_search("Acme", "", model="m", api_key="k")
+    assert (text, url) == ("Acme makes rota software for clinics.", "https://acme.test/about")
+    assert cost.searches == 1
+
+
+def test_a_search_description_citing_an_unreturned_url_is_dropped(monkeypatch):
+    _fake_anthropic(monkeypatch, '{"description": "Acme makes rota software.", '
+                                 '"source_url": "https://made-up.test/acme"}')
+    assert ws.describe_by_search("Acme", "", model="m", api_key="k")[:2] == ("", "")

@@ -44,10 +44,16 @@ def _round_payload(row: dict, funds: list[str] = ()) -> dict:
         "company": row["company"],
         "domain": row.get("domain") or "",
         "summary": row.get("summary") or row.get("company_summary") or "",
+        # What the company does, written from an article body (describe.py); the
+        # headline summary above stands in until one exists.
+        "description": row.get("description") or "",
+        "description_url": row.get("description_url") or "",
         "stage": row.get("stage") or "",
         "amount": row.get("amount_value"),
         "currency": row.get("currency") or "",
-        "amount_usd": row.get("amount_usd") or approx_usd(row.get("amount_value"), row.get("currency") or "USD") or 0,
+        # Always from the amount as reported, so a filter can never disagree with
+        # the figure printed on the card.
+        "amount_usd": approx_usd(row.get("amount_value"), row.get("currency") or "USD") or 0,
         "date": row.get("announced_date") or row.get("first_seen_at"),
         "region": row.get("region") or "other",
         "sector": row.get("sector") or "",
@@ -73,7 +79,8 @@ def _sources(rows: list[dict]) -> list[dict]:
     """
     cleaned = []
     for row in rows:
-        url = row.get("url") or row.get("article_url") or ""
+        # The publisher's own URL when a Google News link has been resolved.
+        url = row.get("resolved_url") or row.get("url") or row.get("article_url") or ""
         outlet = (row.get("outlet") or "").split("·")[-1].strip()
         if not url:
             continue

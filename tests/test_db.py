@@ -301,3 +301,61 @@ def test_a_round_keeps_the_earliest_date_it_was_reported_on(db):
     early = _round_for("Acme AI", 12_000_000, date="2026-09-22T00:00:00+00:00")
     db.upsert_round(early, company_id)
     assert db.get_round(round_id)["announced_date"].startswith("2026-09-22")
+
+
+# ---- columns survive every merge -----------------------------------------
+
+def test_a_merge_on_learning_the_domain_keeps_every_column(db):
+    by_name = db.upsert_company(_round(company="Forge Studio", company_domain="",
+                                       summary="A venture studio that builds B2B startups"))
+    db.upsert_round(_round(company="Forge Studio", company_domain=""), by_name)
+    db.set_description(by_name, "Forge builds and funds B2B software companies.", "https://x.test/a")
+    assert db.get_company(by_name)["is_studio"] == 1
+
+    by_domain = db.upsert_company(_round(company="Forge Studio", company_domain="forge.vc", summary=""))
+    merged = db.get_company(by_domain)
+    assert merged["is_studio"] == 1
+    assert merged["description"] == "Forge builds and funds B2B software companies."
+    assert merged["description_url"] == "https://x.test/a"
+
+
+def test_absorbing_a_company_keeps_the_description_it_brings(db):
+    target = db.upsert_company(_round(company="Kasvu Therapeutics", company_domain=""))
+    source = db.upsert_company(_round(company="Kasvu", company_domain=""))
+    db.set_description(source, "Kasvu develops cell therapies.", "https://x.test/k")
+    db.absorb_company(source, target)
+    kept = db.get_company(target)
+    assert kept["description"] == "Kasvu develops cell therapies."
+    assert kept["description_url"] == "https://x.test/k"
+
+
+def test_absorbing_never_overwrites_an_existing_description(db):
+    target = db.upsert_company(_round(company="Kasvu Therapeutics", company_domain=""))
+    source = db.upsert_company(_round(company="Kasvu", company_domain=""))
+    db.set_description(target, "Target text.", "https://x.test/t")
+    db.set_description(source, "Source text.", "https://x.test/s")
+    db.absorb_company(source, target)
+    kept = db.get_company(target)
+    assert (kept["description"], kept["description_url"]) == ("Target text.", "https://x.test/t")
+
+
+def test_an_old_database_file_gains_the_new_columns(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        CREATE TABLE companies (company_id TEXT PRIMARY KEY, canonical_name TEXT NOT NULL,
+            name_key TEXT NOT NULL, domain TEXT DEFAULT '', aliases TEXT DEFAULT '[]',
+            summary TEXT DEFAULT '', hq_city TEXT DEFAULT '', hq_country TEXT DEFAULT '',
+            region TEXT DEFAULT '', sector TEXT DEFAULT '', ai_native INTEGER DEFAULT 0,
+            first_seen_at TEXT NOT NULL, last_seen_at TEXT);
+        INSERT INTO companies (company_id, canonical_name, name_key, first_seen_at)
+            VALUES ('n:acme', 'Acme', 'acme', '2026-09-01');
+    """)
+    conn.close()
+    with FundingDatabase(path) as upgraded:
+        company = upgraded.get_company("n:acme")
+        assert company["description"] == "" and company["is_studio"] == 0
+        columns = {r[1] for r in upgraded._conn.execute("PRAGMA table_info(round_sources)")}
+        assert "resolved_url" in columns

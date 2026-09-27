@@ -283,3 +283,49 @@ def _get(obj, key):
 def _http_error(exc: Exception) -> str:
     body = getattr(getattr(exc, "response", None), "text", "") or ""
     return f"{exc}"[:200] + (f" | {body[:300]}" if body else "")
+
+
+# ---- describing one company, when no article could be read -----------------
+
+DESCRIBE_SYSTEM = (
+    "Search once for the company named, then write one or two plain sentences on what it "
+    "does: the product and who it is for, from the search results only. No funding details, "
+    "no marketing language. Give the URL of the result you relied on. If the results do not "
+    "say what the company does, return an empty description."
+)
+DESCRIBE_SCHEMA = {
+    "type": "object",
+    "properties": {"description": {"type": "string"}, "source_url": {"type": "string"}},
+    "required": ["description", "source_url"],
+    "additionalProperties": False,
+}
+
+
+def describe_by_search(company: str, hint: str, *, model: str, api_key: str) -> tuple[str, str, SearchCost]:
+    """(description, source url, cost) for one company, from a single web search."""
+    import anthropic
+
+    try:
+        response = anthropic.Anthropic(api_key=api_key).messages.create(
+            model=model, max_tokens=2000, system=DESCRIBE_SYSTEM,
+            output_config={"effort": "low", "format": {"type": "json_schema", "schema": DESCRIBE_SCHEMA}},
+            tools=[{"type": ANTHROPIC_TOOL, "name": "web_search", "max_uses": 1}],
+            messages=[{"role": "user", "content": f"{company} (startup; {hint})".strip()}],
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Describe search for %s failed: %s", company, exc)
+        return "", "", SearchCost()
+    cost = anthropic_cost(response.usage)
+    text = "".join(_get(block, "text") or "" for block in response.content if _get(block, "type") == "text")
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return "", "", cost
+    # The source must be a page the search actually returned, never a URL the model
+    # wrote; a description that cannot be traced to one is dropped.
+    returned = {a.url for a in anthropic_articles(response.content, "describe")}
+    url = parsed.get("source_url") or ""
+    description = (parsed.get("description") or "").strip()
+    if not description or url not in returned:
+        return "", "", cost
+    return description, url, cost

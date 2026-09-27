@@ -57,7 +57,11 @@ class FundingDatabase:
     def _migrate(self) -> None:
         """Add columns that CREATE TABLE IF NOT EXISTS will not add to an old file."""
         for table, column, definition in (("round_sources", "currency", "TEXT DEFAULT ''"),
-                                          ("companies", "is_studio", "INTEGER DEFAULT 0")):
+                                          ("round_sources", "resolved_url", "TEXT DEFAULT ''"),
+                                          ("companies", "is_studio", "INTEGER DEFAULT 0"),
+                                          ("companies", "description", "TEXT DEFAULT ''"),
+                                          ("companies", "description_url", "TEXT DEFAULT ''"),
+                                          ("companies", "described_at", "TEXT")):
             existing = {row["name"] for row in self._conn.execute(f"PRAGMA table_info({table})")}
             if column not in existing:
                 self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
@@ -187,16 +191,14 @@ class FundingDatabase:
         if old is None or old_id == new_id:
             return
         aliases = set(json.loads(old["aliases"] or "[]")) | {old["name_key"], normalize_company(round_.company)}
+        # Every column is carried across: listing them by hand once lost is_studio.
+        row = dict(old) | {"company_id": new_id, "domain": normalize_domain(round_.company_domain),
+                           "aliases": json.dumps(sorted(aliases)), "last_seen_at": _now()}
+        columns = ", ".join(row)
         self._conn.execute(
-            """
-            INSERT INTO companies (company_id, canonical_name, name_key, domain, aliases, summary,
-                hq_city, hq_country, region, sector, ai_native, first_seen_at, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(company_id) DO UPDATE SET aliases = excluded.aliases
-            """,
-            (new_id, old["canonical_name"], old["name_key"], normalize_domain(round_.company_domain),
-             json.dumps(sorted(aliases)), old["summary"], old["hq_city"], old["hq_country"],
-             old["region"], old["sector"], old["ai_native"], old["first_seen_at"], _now()),
+            f"INSERT INTO companies ({columns}) VALUES ({', '.join('?' for _ in row)}) "
+            "ON CONFLICT(company_id) DO UPDATE SET aliases = excluded.aliases",
+            tuple(row.values()),
         )
         self._conn.execute("UPDATE rounds SET company_id = ? WHERE company_id = ?", (new_id, old_id))
         self._conn.execute("DELETE FROM companies WHERE company_id = ?", (old_id,))
@@ -227,13 +229,17 @@ class FundingDatabase:
                 sector = COALESCE(NULLIF(sector, ''), ?),
                 ai_native = MAX(ai_native, ?),
                 is_studio = MAX(is_studio, ?),
+                description = COALESCE(NULLIF(description, ''), ?),
+                description_url = CASE WHEN description = '' THEN ? ELSE description_url END,
+                described_at = COALESCE(described_at, ?),
                 first_seen_at = MIN(first_seen_at, ?),
                 last_seen_at = ?
             WHERE company_id = ?
             """,
             (json.dumps(sorted(a for a in aliases if a)), source["domain"], source["summary"],
              source["hq_city"], source["hq_country"], source["region"], source["sector"],
-             source["ai_native"], source["is_studio"], source["first_seen_at"], _now(), target_id),
+             source["ai_native"], source["is_studio"], source["description"], source["description_url"],
+             source["described_at"], source["first_seen_at"], _now(), target_id),
         )
         self._conn.execute("UPDATE rounds SET company_id = ? WHERE company_id = ?", (target_id, source_id))
         collapsed = self.collapse_rounds(target_id)
@@ -446,8 +452,12 @@ class FundingDatabase:
 
     def set_round_flags(self, round_id: str, *, confirmed: bool | None = None,
                         amount_disputed: bool | None = None, qualified: bool | None = None,
-                        qualified_reason: str | None = None) -> None:
+                        qualified_reason: str | None = None,
+                        amount_usd: float | None = None) -> None:
         sets, values = [], []
+        if amount_usd is not None:
+            sets.append("amount_usd = ?")
+            values.append(amount_usd)
         for column, value in (("confirmed", confirmed), ("amount_disputed", amount_disputed), ("qualified", qualified)):
             if value is not None:
                 sets.append(f"{column} = ?")
@@ -527,6 +537,18 @@ class FundingDatabase:
         )
         self._conn.commit()
 
+    def set_description(self, company_id: str, description: str, url: str) -> None:
+        self._conn.execute(
+            "UPDATE companies SET description = ?, description_url = ?, described_at = ? WHERE company_id = ?",
+            (description, url, _now(), company_id))
+        self._conn.commit()
+
+    def set_resolved_url(self, round_id: str, article_url: str, resolved_url: str) -> None:
+        self._conn.execute(
+            "UPDATE round_sources SET resolved_url = ? WHERE round_id = ? AND article_url = ?",
+            (resolved_url, round_id, article_url))
+        self._conn.commit()
+
     def round_sources(self, round_id: str) -> list[dict]:
         rows = self._conn.execute(
             "SELECT * FROM round_sources WHERE round_id = ? ORDER BY seen_at", (round_id,)
@@ -595,6 +617,7 @@ class FundingDatabase:
         rows = self._conn.execute(
             f"""
             SELECT r.*, c.canonical_name AS company, c.domain, c.summary AS company_summary,
+                   c.description, c.description_url, c.described_at,
                    c.hq_city, c.hq_country, c.region, c.sector, c.ai_native, c.is_studio,
                    s.fit_score, s.angle, s.reason AS fit_reason, f.verdict AS feedback
             FROM rounds r

@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS companies (
     sector       TEXT DEFAULT '',
     ai_native    INTEGER DEFAULT 0,
     is_studio    INTEGER DEFAULT 0,         -- venture studio / company builder
+    description  TEXT DEFAULT '',           -- 1-2 sentences on what it does, from an article body
+    description_url TEXT DEFAULT '',        -- the article the description was written from
+    described_at TEXT,
     first_seen_at TEXT NOT NULL,
     last_seen_at  TEXT
 );
@@ -70,6 +73,7 @@ CREATE TABLE IF NOT EXISTS round_sources (
     published_at TEXT,
     amount_value REAL,                      -- what this outlet reported
     currency     TEXT DEFAULT '',           -- and in which currency: outlets convert
+    resolved_url TEXT DEFAULT '',           -- the publisher's own URL behind a Google News link
     seen_at      TEXT NOT NULL,
     PRIMARY KEY (round_id, article_url)
 );

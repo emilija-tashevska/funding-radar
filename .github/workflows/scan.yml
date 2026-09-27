@@ -77,6 +77,7 @@ jobs:
           python -m src.funding_radar.cli run
           python -m src.funding_radar.cli recheck
           python -m src.funding_radar.cli dedupe
+          python -m src.funding_radar.cli describe || echo "::warning::describe failed; the scan is kept without new descriptions"
           python -m src.funding_radar.cli site
 
       - name: Source health

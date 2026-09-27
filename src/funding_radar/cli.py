@@ -25,6 +25,8 @@ def main() -> None:
     sub.add_parser("sources", help="Per-source health from the last run")
     sub.add_parser("recheck", help="Re-apply the rules to stored rounds (no model calls)")
     sub.add_parser("dedupe", help="Merge companies stored twice under two names")
+    describe_p = sub.add_parser("describe", help="Write 1-2 sentences per in-brief company from its article")
+    describe_p.add_argument("--limit", type=int, default=60, help="Companies to describe this run")
     sub.add_parser("test-llm", help="Check the API key and model before a run spends on them")
 
     site_p = sub.add_parser("site", help="Build the static dashboard")
@@ -77,6 +79,13 @@ def main() -> None:
         reply = complete_json("Answer with ok true.", "Are you reachable?", schema,
                               model=settings.EXTRACT_MODEL, effort="low", max_tokens=100)
         print(f"{settings.EXTRACT_MODEL} reachable: {reply}")
+
+    elif args.command == "describe":
+        from src.funding_radar.describe import describe
+        from src.funding_radar.sources.base import load_config
+
+        with FundingDatabase(settings.DATABASE_PATH) as db:
+            print(json.dumps(describe(db, load_config(), limit=args.limit), indent=2))
 
     elif args.command == "recheck":
         from src.funding_radar.pipeline import recheck

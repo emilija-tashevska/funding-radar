@@ -156,6 +156,14 @@ vc_pages:
 companies_house:
   enabled: false
 
+# One or two sentences per in-brief company, written from the article itself.
+# Runs after each scan (cli describe). When no article can be read, a web search
+# can stand in: $0.01 per search plus tokens, about $0.04 a company. Off until the
+# owner turns it on.
+describe:
+  web_search_fallback: false
+  max_searches: 20
+
 # Search APIs as a discovery source. Off in the scan until scripts/search_probe.py
 # has measured which provider finds new in-brief UK rounds for the money. Six
 # searches a run (the owner's budget), one search per query.
