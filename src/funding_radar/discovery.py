@@ -12,8 +12,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from src.funding_radar.db import FundingDatabase
-from src.funding_radar.settings import settings
 from src.funding_radar.models import Article
+from src.funding_radar.settings import settings
 from src.funding_radar.sources.base import company_hint, headline_key, http_client, load_config
 from src.funding_radar.sources.feeds import fetch_google_news, fetch_rss
 from src.funding_radar.sources.gdelt import fetch_gdelt

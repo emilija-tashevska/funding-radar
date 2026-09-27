@@ -28,12 +28,12 @@ These were settled with the owner. Do not quietly change them.
 | Rounds whose headline names no company | Fetch the article body once and re-read before dropping |
 | Confirmation | Two tiers. Confirmed = amount + stage + (a resolved domain or two independent outlets). Unconfirmed rounds are shown; the owner is fine with that |
 | Tracked investors | Antler, Entrepreneur First, Creandum, Techstars (`tracked_investors` in config). The 300k lower floors went with the floor. **Not Y Combinator** — explicitly excluded |
-| Enrichment | None for the MVP |
+| Enrichment | No outside data. Each in-brief company gets 1-2 sentences on what it does, written from the round's own article (owner, 2026-09-27), with the URL it came from |
 | Passphrase | Was in the original brief; the owner later chose a public page with no gate |
 
 ## How it works
 
-Five stages, `src/funding_radar/`:
+Six stages, `src/funding_radar/`:
 
 1. **discovery.py** — runs every source in `config/sources.yaml`, dedupes by
    normalised headline, keeps duplicates as corroboration (`Candidate.duplicates`),
@@ -51,9 +51,14 @@ Five stages, `src/funding_radar/`:
 4. **pipeline.py** — stores the round with its evidence, then judges it. Flags are
    computed from the **merged row**, never from the incoming article: a later,
    thinner report must not demote a round we already hold in full.
-5. **site.py + templates/index.html** — one self-contained page with the data
+5. **describe.py** — for each in-brief company without one, reads the article
+   (resolving a Google News link to the publisher first, `resolve.py`) and has
+   Sonnet write 1-2 sentences from that text only. Tried once per company; a paid
+   web-search fallback exists behind `describe.web_search_fallback` (off).
+6. **site.py + templates/index.html** — one self-contained page with the data
    inlined. Also writes `site/artifact.html`, the same page without the document
-   skeleton, for publishing as a Claude artifact.
+   skeleton, for publishing as a Claude artifact. Filters: region, stage, min and
+   max size ($/£/€ one for one), funds I follow, AI-native, studios, search.
 
 ### Identity rules (the part that matters most)
 
@@ -78,11 +83,15 @@ python -m src.funding_radar.cli rounds --all # print stored rounds
 python -m src.funding_radar.cli sources      # per-source health from the last run
 python -m src.funding_radar.cli dedupe       # fold companies stored under two names
 python -m src.funding_radar.cli recheck      # re-apply the rules; no model calls
+python -m src.funding_radar.cli describe     # 1-2 sentences per in-brief company (cents)
 python -m src.funding_radar.cli site --open  # build the page
 python -m src.funding_radar.cli test-llm     # check the key and model
 python scripts/accuracy_check.py             # score against the labelled set (a few cents)
 python scripts/recall_check.py               # what the pipeline misses
-pytest -q                                    # 212 tests, all offline
+python scripts/data_audit.py                 # amount / link / description coverage
+python scripts/verify_sources.py             # candidate sources (run it on the runner)
+python scripts/search_probe.py               # web search vs Google News (spends ~$0.25)
+pytest -q                                    # 277 tests, offline; browser tests need Playwright
 ```
 
 ## Operations
@@ -96,7 +105,11 @@ pytest -q                                    # 212 tests, all offline
   Move to Turso if it reaches tens of MB.
 - **Secret:** `ANTHROPIC_API_KEY`. The owner sets keys themselves; never ask for
   one, read one, or echo one.
-- **Tests** run on every push.
+- **Tests** run on every push, including the browser tests (Chromium in CI).
+- **Probe:** `.github/workflows/probe.yml` runs the source check, a discovery dry
+  run, describe + audit on a copy of the database, and the search probe on the
+  runner. It never writes the database. Anything that must work from GitHub's IP
+  is measured there, not from a laptop or a sandbox.
 
 ## State
 
@@ -121,31 +134,35 @@ approval, never automatic).
 - **Atomico (429) and Speedinvest (403)** fail on the runners too.
 - **GDELT** rate limits aggressively; paced at one call per 6 seconds, still
   throttled after bursts. Treat as best-effort.
-- **UK coverage is thin**: 5 of 36 in-brief rounds. This is a source-coverage
-  problem, and the owner's practice sells in London.
+- **UK coverage is thin**: 5 of 36 in-brief rounds under the 2M floor; 7 of 48
+  after the floor was removed (database of 2026-09-24). Business Cloud and
+  FinTech Global were added for it.
+- **Anthropic web search (measured 2026-09-27, 6 UK queries):** $0.24 a run, 51
+  results but mostly evergreen pages ("30 best Series B investors"), so 1 new
+  in-brief UK round (Ryft). The same queries through Google News: free, 1 new. Off
+  in the scan (`web_search.enabled`). It does compose with structured outputs.
+- **Tracked funds' own sites** do not announce portfolio rounds (runner check):
+  Antler and EF pages are undated link lists; Techstars has no feed. Their rounds
+  come through the press: four Google News queries, and the "Funds I follow" chip.
+- **Region from a headline** can be wrong: a round with no location in the
+  headline tends to come out as "other" and so out of brief.
 - Extraction scores **62/63** on the labelled set. The one miss is a headline that
   names no company.
 - Stage is often unstated in headlines; those rounds qualify on size alone.
 
-## Next stage: more sources (what the owner asked for)
+## Sources: what was checked (2026-09-27)
 
-Open questions, to be explored and **verified live before being added** — every URL
-in `config/sources.yaml` was checked by fetching it. Earlier in this project seven
-of fifteen invented VC URLs 404'd, so nothing goes in unverified.
+Every URL in `config/sources.yaml` was fetched from the GitHub runner before it went
+in (`scripts/verify_sources.py`, candidates in `config/candidate_sources.yaml`).
+Seven of fifteen earlier invented VC URLs 404'd, so nothing goes in unverified.
 
-- **Anthropic's server-side web search tool** in the Messages API. Plausibly the
-  best fix for both the blocked publishers and the thin UK coverage, since the
-  search runs on Anthropic's side rather than from GitHub's IP. Check the current
-  tool name, whether it can be combined with structured outputs in one call, and
-  the per-search price before designing around it.
-- **Antler and Entrepreneur First pages** — both are tracked investors with lower
-  floors, and both announce their own cohorts and raises.
-- **Techstars** — accelerator cohorts. Note most of its rounds fall under the floor;
-  worth checking whether the follow-on rounds are what matter.
-- Others worth weighing: Companies House SH01 filings (UK share allotments, which
-  are facts rather than press releases), Dealroom and Tracxn, Sifted's UK feed,
-  UKTN, Business Cloud, Beauhurst, the press-release wires, and more non-English
-  locales.
+- Added: Business Cloud, FinTech Global (current, UK funding stories).
+- Refused on the runner: Tech Funding News (403), Finsmes (403), IT Brief (406),
+  Business Weekly and Atomico (429), Speedinvest (403). Broken feeds: FF News,
+  Beauhurst, Insider Media. AltFi empty; Prolific North stale since 2025.
+- Anthropic web search reaches Finsmes, but see Known issues for its yield.
+- Not pursued, by the owner's choice: Companies House, Tavily, OpenAI search.
+- Still open: Dealroom and Tracxn, press-release wires, more non-English locales.
 
 ## Working agreements
 

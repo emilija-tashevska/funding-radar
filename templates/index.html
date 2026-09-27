@@ -179,7 +179,9 @@ function when(iso) {
   if (days < 14) return days + ' days ago';
   return label + (d.getFullYear() === new Date().getFullYear() ? '' : ' ' + d.getFullYear());
 }
-function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+// Links come from feeds and search results: only http(s) may become an href.
+function safeUrl(u) { return /^https?:\/\//i.test(String(u || '')) ? u : ''; }
 
 // Chips carry their count, and a chip that can only ever return nothing is not
 // shown: all the in-brief rounds are European, so an empty "US" chip just reads
@@ -224,7 +226,7 @@ function matches(r, ignore) {
   if (ignore !== 'regions' && state.regions.size && !state.regions.has(r.region || 'other')) return false;
   if (ignore !== 'stages' && state.stages.size && !state.stages.has(r.stage || 'unstated')) return false;
   if (state.q) {
-    const hay = [r.company, r.summary, r.sector, r.hq, (r.investors || []).join(' '),
+    const hay = [r.company, r.summary, r.description, r.sector, r.hq, (r.investors || []).join(' '),
                  (r.sources || []).map(s => s.outlet).join(' ')].join(' ').toLowerCase();
     if (!state.q.split(/\s+/).every(term => hay.includes(term))) return false;
   }
@@ -239,7 +241,7 @@ function host(url) {
 // one, with the page it came from; the headline summary until then.
 function about(r) {
   if (r.description) {
-    const from = r.description_url
+    const from = safeUrl(r.description_url)
       ? ` <a class="src" href="${esc(r.description_url)}" target="_blank" rel="noopener">${esc(host(r.description_url) || 'source')}</a>`
       : '';
     return `<p class="summary">${esc(r.description)}${from}</p>`;
@@ -264,7 +266,7 @@ function card(r) {
   const investors = (r.investors || []).length
     ? `<div class="meta">Backed by <b>${r.investors.map(esc).join(', ')}</b></div>` : '';
   // Four publishers is plenty to prove a round; the rest are on the control view.
-  const all = (r.sources || []).filter(s => s.url);
+  const all = (r.sources || []).filter(s => safeUrl(s.url));
   const shown = control ? all : all.slice(0, 4);
   const links = shown.map(s =>
     `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.outlet || 'the article')}</a>`).join('')

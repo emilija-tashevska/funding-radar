@@ -121,9 +121,9 @@ def qualifies(round_: Round, rules: Rules) -> Verdict:
     floor = rules.floor_for(round_.investors)
     amount = approx_usd(round_.amount_value, round_.currency)
     if not amount:
-        # A reported 0 is an undisclosed amount, not a zero-pound round.
-        # An undisclosed amount at the right stage is still worth seeing; it stays
-        # unconfirmed until a number appears.
+        # Undisclosed (a reported 0 counts as undisclosed, not as a zero-pound
+        # round). Still worth seeing at the right stage; it stays unconfirmed
+        # until a number appears.
         return Verdict(True, "amount undisclosed")
     if amount < floor:
         return Verdict(False, f"{amount:,.0f} is below the {floor:,.0f} floor")
