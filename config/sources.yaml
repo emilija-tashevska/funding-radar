@@ -145,3 +145,18 @@ vc_pages:
 # UK Companies House: verification and unannounced raises (needs COMPANIES_HOUSE_KEY).
 companies_house:
   enabled: false
+
+# Search APIs as a discovery source. Off in the scan until scripts/search_probe.py
+# has measured which provider finds new in-brief UK rounds for the money. Six
+# searches a run (the owner's budget), one search per query.
+web_search:
+  enabled: false
+  country: GB
+  days: 3
+  queries:
+    - UK startup raises seed round
+    - London startup raises Series A funding
+    - UK startup pre-seed funding announced
+    - British startup secures Series B investment
+    - startup raises funding Manchester OR Edinburgh OR Bristol OR Cambridge OR Leeds
+    - Finsmes UK company funding round
