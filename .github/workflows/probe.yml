@@ -20,6 +20,7 @@ on:
       - "scripts/search_probe.py"
       - "scripts/data_audit.py"
       - "src/funding_radar/describe.py"
+      - "scripts/explore_site.py"
 
 permissions:
   contents: read
@@ -59,6 +60,16 @@ jobs:
           python -m src.funding_radar.cli describe --limit 60
           python scripts/data_audit.py
           python -m src.funding_radar.cli site --out site-preview
+
+      - name: Explore Soapbox (how the site is built, before writing a source)
+        run: |
+          python scripts/explore_site.py https://www.soapbox.vc --listing /feed --items /feed \
+            --feed /feed/rss.xml --feed /rss.xml --feed /feed.xml --feed /feed/feed.xml \
+            --feed https://weeklysoak.beehiiv.com/feed --feed https://weeklysoak.beehiiv.com/rss \
+            --feed https://newsletter.soapbox.vc/feed \
+            --probe / --probe "/feed?def97ad6_page=2" --probe /announce \
+            --probe /investor/antler --probe /investor/entrepreneur-first --probe /investor/creandum \
+            --probe /investor/techstars --probe /investor/techstars-ventures --probe /investors/antler
 
       - name: Candidate sources, fetched from the runner
         run: python scripts/verify_sources.py
