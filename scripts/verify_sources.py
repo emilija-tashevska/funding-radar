@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import yaml  # noqa: E402
 
 from src.funding_radar.discovery import looks_like_funding  # noqa: E402
+from src.funding_radar.sources.base import get_with_agents, http_client  # noqa: E402
 from src.funding_radar.sources.feeds import fetch_rss  # noqa: E402
 from src.funding_radar.sources.vc_pages import fetch_vc_page  # noqa: E402
 
@@ -52,6 +53,17 @@ def assess(result, *, now: datetime | None = None) -> dict:
     }
 
 
+def what_came_back(url: str) -> str:
+    """For a feed that failed to parse: status, content type and the first bytes."""
+    try:
+        with http_client() as client:
+            response = get_with_agents(client, url)
+        head = " ".join(response.text[:200].split())
+        return f"HTTP {response.status_code}, {response.headers.get('content-type', '?')}: {head}"
+    except Exception as exc:  # noqa: BLE001
+        return f"fetch failed: {exc}"[:200]
+
+
 def render(rows: list[dict]) -> str:
     lines = ["## Candidate sources, fetched from the runner", "",
              f"| source | ok | items | newest | last {FRESH_DAYS} days | funding-like | error / examples |",
@@ -72,6 +84,9 @@ def main() -> int:
 
     rows = [assess(fetch_rss(c["name"], c["url"])) | {"url": c["url"], "kind": "rss"}
             for c in candidates.get("rss", [])]
+    for row in rows:
+        if not row["ok"]:
+            print(f"{row['name']}: {what_came_back(row['url'])}")
     rows += [assess(fetch_vc_page(c["name"], c["url"])) | {"url": c["url"], "kind": "page"}
              for c in candidates.get("pages", [])]
 

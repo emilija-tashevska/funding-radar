@@ -157,6 +157,12 @@ in (`scripts/verify_sources.py`, candidates in `config/candidate_sources.yaml`).
 Seven of fifteen earlier invented VC URLs 404'd, so nothing goes in unverified.
 
 - Added: Business Cloud, FinTech Global (current, UK funding stories).
+- Added: **Soapbox** (soapbox.vc), a register of UK rounds, one page per round, no RSS.
+  `sources/soapbox.py` reads the sitemap (newest first, 1,475+ items, undated) and
+  `/investors/<fund>` for the tracked funds, and fetches only unseen announcement
+  pages, 40 a run, a second apart; robots.txt disallows only /api/. Pages carry a
+  NewsArticle with `datePublished`, so Soapbox reaches back 120 days. First runner
+  check: 40 fetched, 0 errors; 11 of 13 new candidates in a dry run came from it.
 - Refused on the runner: Tech Funding News (403), Finsmes (403), IT Brief (406),
   Business Weekly and Atomico (429), Speedinvest (403). Broken feeds: FF News,
   Beauhurst, Insider Media. AltFi empty; Prolific North stale since 2025.

@@ -152,6 +152,19 @@ vc_pages:
   - {name: Entrepreneur First, url: "https://www.joinef.com/insights/"}
   - {name: Octopus Ventures, url: "https://octopusventures.com/blog/"}
 
+# Soapbox (soapbox.vc): a register of UK funding rounds, one page per round, suggested
+# by the owner. It has no RSS: the sitemap lists every announcement, and
+# /investors/<fund> lists one fund's rounds. Explored from the runner on 2026-09-29;
+# robots.txt allows everything but /api/, which is never touched. Only unseen pages
+# are fetched, at most max_items_per_run, a second apart. Its pages carry exact
+# dates, so it reaches back over the page's whole window rather than 10 days.
+soapbox:
+  enabled: true
+  max_items_per_run: 40
+  max_age_days: 120
+  # Soapbox's own slugs for the tracked funds (checked: /investors/techstars is 404).
+  investor_pages: [antler, entrepreneur-first, creandum, techstars-ventures]
+
 # UK Companies House: verification and unannounced raises (needs COMPANIES_HOUSE_KEY).
 companies_house:
   enabled: false

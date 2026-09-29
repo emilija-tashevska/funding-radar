@@ -120,6 +120,13 @@ class SourceResult:
     kind: str
     articles: list
     error: str = ""
+    # A source whose items carry exact dates can reach further back than the
+    # default freshness gate (Soapbox backfills the page's whole window).
+    max_age_days: int | None = None
+    # What source health should count, when that is not the articles returned. A
+    # crawler that only returns new pages returns none on a quiet day, which is
+    # normal; the number of items it could see is what shows it is alive.
+    health_items: int | None = None
 
 
 # "London's Metris Energy raises €4.35 million ..." -> "metris energy".

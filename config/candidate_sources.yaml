@@ -18,6 +18,8 @@ rss:
   - {name: Insider Media, url: "https://www.insidermedia.com/rss"}
   - {name: City AM, url: "https://www.cityam.com/feed/"}
   - {name: IT Brief UK, url: "https://itbrief.co.uk/feed"}
+  # Suggested by the owner, 2026-09-29: announces portfolio rounds
+  - {name: Soapbox, url: "https://www.soapbox.vc/feed"}
   # Tracked investors
   - {name: Techstars (feed), url: "https://www.techstars.com/feed"}
   # Blocked last time; rechecked here

@@ -17,6 +17,7 @@ from src.funding_radar.settings import settings
 from src.funding_radar.sources.base import company_hint, headline_key, http_client, load_config
 from src.funding_radar.sources.feeds import fetch_google_news, fetch_rss
 from src.funding_radar.sources.gdelt import fetch_gdelt
+from src.funding_radar.sources.soapbox import fetch_soapbox
 from src.funding_radar.sources.vc_pages import fetch_vc_page
 from src.funding_radar.sources.web_search import search_anthropic
 
@@ -160,8 +161,12 @@ def _web_searches(conf: dict) -> list:
     return results
 
 
-def collect(config: dict, *, client=None) -> list:
-    """Run every configured source once, returning one SourceResult each."""
+def collect(config: dict, *, client=None, seen=None) -> list:
+    """Run every configured source once, returning one SourceResult each.
+
+    `seen(url)` says whether an article is already stored, so a source that must
+    fetch one page per item (Soapbox) fetches only the new ones.
+    """
     own_client = client is None
     client = client or http_client()
     results = []
@@ -184,6 +189,10 @@ def collect(config: dict, *, client=None) -> list:
         for page in config.get("vc_pages", []):
             results.append(fetch_vc_page(page["name"], page["url"], client=client))
 
+        soapbox = config.get("soapbox", {})
+        if soapbox.get("enabled"):
+            results.append(fetch_soapbox(soapbox, seen=seen, client=client))
+
         results.extend(_web_searches(config.get("web_search", {})))
     finally:
         if own_client:
@@ -193,14 +202,16 @@ def collect(config: dict, *, client=None) -> list:
 
 def discover(db: FundingDatabase, config: dict, *, client=None, max_age_days: int = DEFAULT_MAX_AGE_DAYS) -> DiscoveryResult:
     keywords = config.get("filters", {}).get("keywords", [])
-    results = collect(config, client=client)
+    results = collect(config, client=client,
+                      seen=lambda url: db.is_article_seen(Article("", "", "", url).article_id, ""))
 
     by_key: dict[str, Candidate] = {}
     issues: list[dict] = []
     stats = {"sources": len(results), "found": 0, "duplicates": 0, "stale": 0, "off_topic": 0, "candidates": 0}
 
     for result in results:
-        issue = db.record_source(result.name, result.kind, len(result.articles), error=result.error)
+        items = result.health_items if result.health_items is not None else len(result.articles)
+        issue = db.record_source(result.name, result.kind, items, error=result.error)
         if issue:
             issues.append(issue)
         stats["found"] += len(result.articles)
@@ -214,8 +225,14 @@ def discover(db: FundingDatabase, config: dict, *, client=None, max_age_days: in
                 continue
             if db.is_article_seen(article.article_id, key):
                 stats["duplicates"] += 1
+                if not db.is_article_seen(article.article_id, ""):
+                    # The headline is held under another URL. Remember this URL too,
+                    # or a source that fetches page by page (Soapbox) fetches it again
+                    # every run.
+                    db.record_article(article, key, outcome="duplicate",
+                                      company_hint=company_hint(article.title))
                 continue
-            if not _is_recent(article, max_age_days):
+            if not _is_recent(article, result.max_age_days or max_age_days):
                 stats["stale"] += 1
                 db.record_article(article, key, outcome="stale", company_hint=company_hint(article.title))
                 continue
