@@ -22,7 +22,7 @@ def _article(title, url, source="TechCrunch", kind="rss", published=None):
 
 
 def _collect(results):
-    return lambda config, client=None: results
+    return lambda config, client=None, seen=None: results
 
 
 def test_only_recent_on_topic_new_articles_survive(db, monkeypatch):
@@ -187,3 +187,28 @@ def test_web_search_needs_a_key(monkeypatch):
     monkeypatch.setattr(discovery.settings, "ANTHROPIC_API_KEY", "")
     monkeypatch.setattr(discovery, "search_anthropic", lambda *a, **k: pytest.fail("called without a key"))
     assert discovery._web_searches({"enabled": True, "queries": ["a"]}) == []
+
+
+def test_a_headline_already_held_under_another_url_is_remembered_by_url(db, monkeypatch):
+    first = _article("Acme raises $12M Series A", "https://tc.test/acme")
+    monkeypatch.setattr(discovery, "collect", _collect([SourceResult("TechCrunch", "rss", [first])]))
+    result = discovery.discover(db, {"filters": {"keywords": ["raises"]}})
+    db.record_article(result.candidates[0].article, discovery.headline_key(first.title), outcome="extracted")
+
+    again = _article("Acme raises $12M Series A", "https://www.soapbox.vc/feed/acme-series-a", source="Soapbox")
+    monkeypatch.setattr(discovery, "collect", _collect([SourceResult("Soapbox", "soapbox", [again])]))
+    discovery.discover(db, {"filters": {"keywords": ["raises"]}})
+    assert db.is_article_seen(again.article_id, "")      # so Soapbox will not fetch it again
+
+
+def test_a_source_can_reach_further_back_than_the_default(db, monkeypatch):
+    sixty_days = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+    soapbox_item = _article("Acme raises £2m seed", "https://www.soapbox.vc/feed/acme-seed",
+                            source="Soapbox", kind="soapbox", published=sixty_days)
+    feed_item = _article("Beta raises £3m seed", "https://tc.test/beta", published=sixty_days)
+    monkeypatch.setattr(discovery, "collect", _collect([
+        SourceResult("Soapbox", "soapbox", [soapbox_item], max_age_days=120),
+        SourceResult("TechCrunch", "rss", [feed_item])]))
+    result = discovery.discover(db, {"filters": {"keywords": ["raises"]}})
+    assert [c.article.title for c in result.candidates] == ["Acme raises £2m seed"]
+    assert result.stats["stale"] == 1

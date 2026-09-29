@@ -120,6 +120,9 @@ class SourceResult:
     kind: str
     articles: list
     error: str = ""
+    # A source whose items carry exact dates can reach further back than the
+    # default freshness gate (Soapbox backfills the page's whole window).
+    max_age_days: int | None = None
 
 
 # "London's Metris Energy raises €4.35 million ..." -> "metris energy".

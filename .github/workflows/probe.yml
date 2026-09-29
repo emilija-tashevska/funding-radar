@@ -21,6 +21,7 @@ on:
       - "scripts/data_audit.py"
       - "src/funding_radar/describe.py"
       - "scripts/explore_site.py"
+      - "src/funding_radar/sources/soapbox.py"
 
 permissions:
   contents: read
@@ -61,16 +62,10 @@ jobs:
           python scripts/data_audit.py
           python -m src.funding_radar.cli site --out site-preview
 
-      - name: Explore Soapbox (how the site is built, before writing a source)
+      - name: Soapbox source, as one scan would run it
         run: |
-          python scripts/explore_site.py https://www.soapbox.vc --items /feed --skip-basics \
-            --dump /feed --dump / \
-            --item /feed/standardx-seed --item /feed/jack-jill-15m-seed \
-            --cards /investors/antler --cards /companies/jack-jill \
-            --newsletter https://newsletter.soapbox.vc/feed \
-            --probe /investors/entrepreneur-first --probe /investors/creandum \
-            --probe /investors/techstars --probe /investors/techstars-ventures \
-            --probe "/feed?page=2"
+          cp data/funding.db data/soapbox.db
+          DATABASE_PATH=data/soapbox.db python -m src.funding_radar.sources.soapbox
 
       - name: Candidate sources, fetched from the runner
         run: python scripts/verify_sources.py
