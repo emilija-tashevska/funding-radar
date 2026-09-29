@@ -274,3 +274,12 @@ def test_the_page_fits_a_phone_without_sideways_scrolling(browser, page_path):
     assert tab.evaluate("document.documentElement.scrollWidth") <= 390
     assert tab.locator("article.card").count() == IN_BRIEF
     context.close()
+
+
+def test_the_tab_has_an_icon(page):
+    href = page.get_attribute('link[rel="icon"]', "href")
+    assert href.startswith("data:image/svg+xml,")
+    # The icon itself renders: load it as an image and check it has a size.
+    width = page.evaluate("""href => new Promise(ok => { const i = new Image();
+        i.onload = () => ok(i.naturalWidth); i.onerror = () => ok(0); i.src = href; })""", href)
+    assert width > 0
