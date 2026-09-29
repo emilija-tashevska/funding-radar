@@ -149,15 +149,21 @@ class FundingDatabase:
                 summary = COALESCE(NULLIF(?, ''), summary),
                 hq_city = COALESCE(NULLIF(?, ''), hq_city),
                 hq_country = COALESCE(NULLIF(?, ''), hq_country),
-                region = COALESCE(NULLIF(?, ''), region),
-                sector = COALESCE(NULLIF(?, ''), sector),
+                -- "other" region and "Other" sector are the extractor's fallbacks when
+                -- an article does not say. A later, vaguer report must never replace
+                -- what an earlier one did say.
+                region = CASE WHEN ? IN ('', 'other') THEN COALESCE(NULLIF(region, ''), NULLIF(?, ''), region)
+                              ELSE ? END,
+                sector = CASE WHEN ? IN ('', 'Other') THEN COALESCE(NULLIF(sector, ''), NULLIF(?, ''), sector)
+                              ELSE ? END,
                 ai_native = MAX(ai_native, ?),
                 is_studio = MAX(is_studio, ?),
                 last_seen_at = ?
             WHERE company_id = ?
             """,
             (incoming_name, domain, json.dumps(sorted(aliases)), round_.summary, round_.hq_city,
-             round_.hq_country, round_.region, round_.sector, int(round_.ai_native),
+             round_.hq_country, round_.region, round_.region, round_.region,
+             round_.sector, round_.sector, round_.sector, int(round_.ai_native),
              int(looks_like_studio(round_.company, round_.summary)), now, company_id),
         )
         self._conn.commit()
