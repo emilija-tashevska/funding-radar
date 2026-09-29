@@ -63,13 +63,14 @@ jobs:
 
       - name: Explore Soapbox (how the site is built, before writing a source)
         run: |
-          python scripts/explore_site.py https://www.soapbox.vc --listing /feed --items /feed \
-            --feed /feed/rss.xml --feed /rss.xml --feed /feed.xml --feed /feed/feed.xml \
-            --feed https://weeklysoak.beehiiv.com/feed --feed https://weeklysoak.beehiiv.com/rss \
-            --feed https://newsletter.soapbox.vc/feed \
-            --probe / --probe "/feed?def97ad6_page=2" --probe /announce \
-            --probe /investor/antler --probe /investor/entrepreneur-first --probe /investor/creandum \
-            --probe /investor/techstars --probe /investor/techstars-ventures --probe /investors/antler
+          python scripts/explore_site.py https://www.soapbox.vc --items /feed --skip-basics \
+            --dump /feed --dump / \
+            --item /feed/standardx-seed --item /feed/jack-jill-15m-seed \
+            --cards /investors/antler --cards /companies/jack-jill \
+            --newsletter https://newsletter.soapbox.vc/feed \
+            --probe /investors/entrepreneur-first --probe /investors/creandum \
+            --probe /investors/techstars --probe /investors/techstars-ventures \
+            --probe "/feed?page=2"
 
       - name: Candidate sources, fetched from the runner
         run: python scripts/verify_sources.py

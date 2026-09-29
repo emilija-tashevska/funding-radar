@@ -146,6 +146,74 @@ def item_page(client, url: str) -> None:
     say(f"  common classes: {[c for c, _ in classes.most_common(25)]}")
 
 
+def dump(client, base: str, path: str, item_prefix: str) -> None:
+    """Where does a page keep its items when it renders no links? Show the raw shape."""
+    section(f"raw shape of {path}")
+    response = get(client, urljoin(base, path))
+    if response is None:
+        return
+    html = response.text
+    for marker in ("__NEXT_DATA__", "self.__next_f", "framer", "webflow", "data-wf", "wix", "nuxt",
+                   "application/json", "application/ld+json", "hydrat"):
+        say(f"  '{marker}': {html.count(marker)}")
+    for needle in (item_prefix + "/", item_prefix.strip("/") + "/", "soapbox.vc" + item_prefix):
+        hits = [m.start() for m in re.finditer(re.escape(needle), html)]
+        say(f"  occurrences of {needle!r}: {len(hits)}")
+        for start in hits[:4]:
+            say(f"    ...{' '.join(html[max(0, start - 140):start + 120].split())}...")
+    soup = BeautifulSoup(html, "lxml")
+    for script in soup.find_all("script"):
+        src, body = script.get("src"), script.string or ""
+        if src or len(body) > 2000:
+            say(f"  <script id={script.get('id')} type={script.get('type')} src={str(src)[:90]} len={len(body)}>")
+    headings = [" ".join(h.get_text(" ", strip=True).split())[:110] for h in soup.find_all(["h2", "h3"])][:10]
+    say(f"  h2/h3 on page: {headings}")
+    clickable = [el for el in soup.find_all(attrs={"onclick": True})] + soup.find_all(attrs={"data-href": True})
+    say(f"  onclick/data-href elements: {len(clickable)}")
+    anchors = [a.get("href") for a in soup.find_all("a", href=True)]
+    say(f"  {len(anchors)} anchors; sample: {anchors[:25]}")
+
+
+def cards(client, base: str, path: str, item_prefix: str) -> None:
+    """What the server-rendered item cards on a page carry (anchor text, dates, nearby text)."""
+    section(f"cards on {path}")
+    response = get(client, urljoin(base, path))
+    if response is None:
+        return
+    soup = BeautifulSoup(response.text, "lxml")
+    shown = 0
+    for anchor in soup.find_all("a", href=True):
+        href = urljoin(base, anchor["href"])
+        if not urlparse(href).path.startswith(item_prefix + "/"):
+            continue
+        card = anchor
+        for _ in range(3):
+            card = card.parent if card.parent is not None else card
+        say(f"  {href}\n    anchor: {' '.join(anchor.get_text(' ', strip=True).split())[:140]!r}"
+            f"\n    card: {' '.join(card.get_text(' ', strip=True).split())[:260]!r}")
+        shown += 1
+        if shown >= 5:
+            break
+
+
+def newsletter(client, url: str, item_host: str) -> None:
+    """Does each issue of the newsletter link every round it covers?"""
+    section(f"newsletter {url}")
+    response = get(client, url)
+    if response is None:
+        return
+    parsed = feedparser.parse(response.text)
+    for entry in parsed.entries[:2]:
+        html = (entry.get("content") or [{}])[0].get("value", "") or entry.get("summary", "")
+        soup = BeautifulSoup(html, "lxml")
+        links = [(a.get("href", ""), " ".join(a.get_text(" ", strip=True).split()))
+                 for a in soup.find_all("a", href=True) if item_host in a.get("href", "")]
+        say(f"  {entry.get('published')} | {entry.get('title')} | {len(html):,} chars | {len(links)} links to {item_host}")
+        for href, text in links[:12]:
+            say(f"    {text[:110]!r} -> {href}")
+        say(f"    text sample: {' '.join(soup.get_text(' ', strip=True).split())[:700]}")
+
+
 def probes(client, base: str, paths: list[str], item_prefix: str) -> None:
     section("probed pages")
     for path in paths:
@@ -166,15 +234,29 @@ def main() -> int:
     parser.add_argument("--items", default="/feed", help="path prefix of item pages")
     parser.add_argument("--feed", action="append", default=[], help="candidate feed paths")
     parser.add_argument("--probe", action="append", default=[])
+    parser.add_argument("--dump", action="append", default=[], help="pages to show the raw shape of")
+    parser.add_argument("--item", action="append", default=[], help="item pages to read in full")
+    parser.add_argument("--cards", action="append", default=[], help="pages whose item cards to show")
+    parser.add_argument("--newsletter", action="append", default=[], help="newsletter feeds to open")
+    parser.add_argument("--skip-basics", action="store_true", help="skip robots, sitemap, feeds, listing")
     args = parser.parse_args()
     say(f"## Exploring {args.base}")
     with http_client() as client:
-        robots(client, args.base)
-        sitemap(client, args.base, args.items)
-        feeds(client, args.base, args.feed)
-        items = listing(client, args.base, args.listing, args.items)
-        if items:
-            item_page(client, items[0])
+        if not args.skip_basics:
+            robots(client, args.base)
+            sitemap(client, args.base, args.items)
+            feeds(client, args.base, args.feed)
+            items = listing(client, args.base, args.listing, args.items)
+            if items:
+                item_page(client, items[0])
+        for path in args.dump:
+            dump(client, args.base, path, args.items)
+        for path in args.item:
+            item_page(client, urljoin(args.base, path))
+        for path in args.cards:
+            cards(client, args.base, path, args.items)
+        for url in args.newsletter:
+            newsletter(client, url, urlparse(args.base).netloc.replace("www.", ""))
         probes(client, args.base, args.probe, args.items)
     if os.getenv("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
