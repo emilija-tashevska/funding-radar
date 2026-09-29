@@ -210,7 +210,8 @@ def discover(db: FundingDatabase, config: dict, *, client=None, max_age_days: in
     stats = {"sources": len(results), "found": 0, "duplicates": 0, "stale": 0, "off_topic": 0, "candidates": 0}
 
     for result in results:
-        issue = db.record_source(result.name, result.kind, len(result.articles), error=result.error)
+        items = result.health_items if result.health_items is not None else len(result.articles)
+        issue = db.record_source(result.name, result.kind, items, error=result.error)
         if issue:
             issues.append(issue)
         stats["found"] += len(result.articles)

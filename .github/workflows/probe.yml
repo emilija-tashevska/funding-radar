@@ -22,6 +22,7 @@ on:
       - "src/funding_radar/describe.py"
       - "scripts/explore_site.py"
       - "src/funding_radar/sources/soapbox.py"
+      - "scripts/soapbox_report.py"
 
 permissions:
   contents: read
@@ -62,10 +63,28 @@ jobs:
           python scripts/data_audit.py
           python -m src.funding_radar.cli site --out site-preview
 
-      - name: Soapbox source, as one scan would run it
+      - name: Full scan twice on a copy of the live database (nothing saved)
+        if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[full-scan]')
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_PATH: data/fullscan.db
         run: |
-          cp data/funding.db data/soapbox.db
-          DATABASE_PATH=data/soapbox.db python -m src.funding_radar.sources.soapbox
+          cp data/funding.db data/fullscan.db
+          for pass in 1 2; do
+            echo "::group::scan pass $pass"
+            start=$(date +%s)
+            # Any crash fails the step, with its log; grep only chooses what to show.
+            python -m src.funding_radar.cli run > run$pass.log 2>&1 || { tail -60 run$pass.log; exit 1; }
+            grep -E "Soapbox|Discovery:|Extraction|Stored|stored|WARNING|ERROR" run$pass.log | tail -25 || true
+            python -m src.funding_radar.cli recheck > /dev/null
+            python -m src.funding_radar.cli dedupe > /dev/null
+            python -m src.funding_radar.cli describe > describe$pass.log 2>&1 || { tail -40 describe$pass.log; exit 1; }
+            tail -12 describe$pass.log
+            python -m src.funding_radar.cli site --out site-preview > /dev/null
+            echo "pass $pass took $(( $(date +%s) - start ))s"
+            echo "::endgroup::"
+          done
+          python scripts/soapbox_report.py
 
       - name: Candidate sources, fetched from the runner
         run: python scripts/verify_sources.py

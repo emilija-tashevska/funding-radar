@@ -29,6 +29,11 @@ BASE = "https://www.soapbox.vc"
 ITEM_PREFIX = "/feed/"
 NAME = "Soapbox"
 PAUSE_SECONDS = 1.0
+# If Soapbox starts refusing us, stop rather than try every page: each refused page
+# costs three agents and their timeouts, enough to run the whole scan out of time.
+MAX_CONSECUTIVE_FAILURES = 5
+# A hard ceiling on the time Soapbox may take in one scan, whatever happens.
+TIME_BUDGET_SECONDS = 300
 
 
 def is_item(url: str) -> bool:
@@ -128,8 +133,13 @@ def fetch_soapbox(conf: dict, *, seen=None, client=None) -> SourceResult:
             except Exception as exc:  # noqa: BLE001 - one missing fund page must not stop the rest
                 errors.append(f"investors/{fund}: {str(exc)[:80]}")
             time.sleep(PAUSE_SECONDS)
+        sitemap_count = 0
         try:
-            queue += item_urls_from_sitemap(get_with_agents(client, f"{BASE}/sitemap.xml").text)
+            listed = item_urls_from_sitemap(get_with_agents(client, f"{BASE}/sitemap.xml").text)
+            sitemap_count = len(listed)
+            if not listed:
+                errors.append("sitemap: lists no announcements (format changed?)")
+            queue += listed
         except Exception as exc:  # noqa: BLE001
             errors.append(f"sitemap: {str(exc)[:120]}")
 
@@ -138,22 +148,44 @@ def fetch_soapbox(conf: dict, *, seen=None, client=None) -> SourceResult:
             if url not in queued and not seen(url):
                 queued.add(url)
                 todo.append(url)
-        articles = []
+        articles: list[Article] = []
+        failures_in_a_row, started = 0, time.monotonic()
         for url in todo[:cap]:
+            if failures_in_a_row >= MAX_CONSECUTIVE_FAILURES:
+                errors.append(f"stopped after {failures_in_a_row} failures in a row")
+                break
+            if time.monotonic() - started > TIME_BUDGET_SECONDS:
+                errors.append(f"stopped at the {TIME_BUDGET_SECONDS}s time budget")
+                break
             try:
                 article = parse_item(get_with_agents(client, url).text, url)
-                if article:
-                    articles.append(article)
             except Exception as exc:  # noqa: BLE001
+                article = None
                 errors.append(f"{urlparse(url).path}: {str(exc)[:80]}")
+            else:
+                if article is None:
+                    errors.append(f"{urlparse(url).path}: no headline")
+                elif not article.published_at:
+                    # Undated, it would pass every freshness check and send the whole
+                    # backlog to the extractor. A dateless page means the layout changed.
+                    errors.append(f"{urlparse(url).path}: no date")
+                    article = None
+            if article:
+                articles.append(article)
+                failures_in_a_row = 0
+            else:
+                failures_in_a_row += 1
             time.sleep(PAUSE_SECONDS)
         logger.info("Soapbox: %d unseen announcements, %d fetched this run, %d errors",
                     len(todo), len(articles), len(errors))
         # Health: no sitemap, or nothing fetched when there was something to fetch, is
         # a failure; a few pages or one fund page failing is not.
         sitemap_failed = any(e.startswith("sitemap") for e in errors)
-        error = "; ".join(errors[:3]) if sitemap_failed or (errors and todo and not articles) else ""
-        return SourceResult(NAME, "soapbox", articles, error=error, max_age_days=max_age)
+        stopped = any(e.startswith("stopped") for e in errors)
+        broken = sitemap_failed or stopped or (errors and todo and not articles)
+        error = "; ".join(errors[-3:] if stopped else errors[:3]) if broken else ""
+        return SourceResult(NAME, "soapbox", articles, error=error, max_age_days=max_age,
+                            health_items=sitemap_count)
     finally:
         if own:
             client.close()
