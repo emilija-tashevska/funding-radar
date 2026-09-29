@@ -10,7 +10,7 @@ on:
       search:
         description: "Run the paid search probe too"
         type: boolean
-        default: true
+        default: false
   push:
     branches: ["claude/**"]
     paths:
@@ -67,7 +67,8 @@ jobs:
         run: python -m src.funding_radar.cli run --dry-run 2>&1 | tail -40
 
       - name: Search probe
-        if: github.event_name == 'push' || inputs.search
+        # Paid (about $0.40): only when asked for, never on a push.
+        if: github.event_name == 'workflow_dispatch' && inputs.search
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
