@@ -186,8 +186,8 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ 
 function safeUrl(u) { return /^https?:\/\//i.test(String(u || '')) ? u : ''; }
 
 // Chips carry their count, and a chip that can only ever return nothing is not
-// shown: all the in-brief rounds are European, so an empty "US" chip just reads
-// as a filter that does not work.
+// shown: a region with no in-brief rounds (Elsewhere, usually) would just read as
+// a filter that does not work.
 function facetOf(r, key) { return key === 'regions' ? (r.region || 'other') : (r.stage || 'unstated'); }
 
 function drawFacets(host, values, key, labels) {

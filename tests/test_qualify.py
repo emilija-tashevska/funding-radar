@@ -131,8 +131,35 @@ def test_any_size_of_round_qualifies_under_the_live_brief(amount):
 
 
 def test_region_and_stage_still_apply_without_a_floor():
-    assert not qualifies(_round(region="us", amount_value=150_000), LIVE_RULES).qualified
+    assert not qualifies(_round(region="other", amount_value=150_000), LIVE_RULES).qualified
     assert not qualifies(_round(stage="Series C", amount_value=150_000), LIVE_RULES).qualified
+
+
+def test_the_live_brief_covers_the_uk_europe_and_the_us():
+    # The owner added the US on 2026-10-25; elsewhere stays out.
+    assert set(LIVE_RULES.regions) == {"uk", "europe", "us"}
+    assert qualifies(_round(region="us", currency="USD", amount_value=3_000_000), LIVE_RULES).qualified
+
+
+@pytest.mark.parametrize("stage,amount,expected", [
+    ("", 1_850_000_000, False),    # Ramp: no stage in the headline, far past a Series B
+    ("", 60_000_000, False),
+    ("", 50_000_000, True),        # at the ceiling, still in
+    ("", 12_000_000, True),
+    ("", None, True),              # undisclosed: nothing to judge the size by
+    ("Series B", 60_000_000, True),  # a stated stage is believed, whatever the size
+])
+def test_a_round_with_no_stated_stage_is_out_when_too_big_for_a_series_b(stage, amount, expected):
+    round_ = _round(region="us", stage=stage, currency="USD", amount_value=amount)
+    verdict = qualifies(round_, LIVE_RULES)
+    assert verdict.qualified is expected
+    if not expected:
+        assert "stage not stated" in verdict.reason
+
+
+def test_no_ceiling_unless_configured():
+    assert RULES.unstated_stage_max == 0
+    assert qualifies(_round(stage="", amount_value=900_000_000), RULES).qualified
 
 
 def test_a_reported_zero_is_read_as_undisclosed():

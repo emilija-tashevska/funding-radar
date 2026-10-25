@@ -10,7 +10,14 @@ filters:
   # Funds whose portfolio we follow; stored as tracked in the investors table.
   tracked_investors: [Antler, Entrepreneur First, Creandum, Techstars]
   stages: [pre-seed, seed, series a, series b]
-  regions: [uk, europe]
+  # US added by the owner on 2026-10-25 (was UK and Europe only). Elsewhere is
+  # still stored and filterable but out of brief.
+  regions: [uk, europe, us]
+  # A round whose news names no stage is judged on its size. Above this (dollars,
+  # pounds and euros one for one) it is later than a Series B, so out of brief.
+  # Added with the US: without it, 33 US rounds of $50M+ with no stated stage
+  # (Ramp's $1.85B among them) would have joined a seed-to-Series-B list. 0: no ceiling.
+  unstated_stage_max_amount: 50000000
   # Rounds stay on the site for this long.
   window_days: 120
   # Cheap keyword gate before any model call.
@@ -116,13 +123,22 @@ google_news:
     - '"Entrepreneur First" startup raises (seed OR "pre-seed")'
     - '"Creandum" raises (seed OR "Series A")'
     - '"Techstars" startup raises seed'
-  # Rounds reported only in the local language never reach the English feeds.
+  # Rounds reported only in the local language never reach the English feeds,
+  # and US news needs the US edition of Google News.
   extra_locales:
     - {hl: "de", gl: "DE", ceid: "DE:de", query: 'startup "Millionen" Finanzierungsrunde'}
     - {hl: "fr", gl: "FR", ceid: "FR:fr", query: 'startup "levée de fonds" millions'}
     - {hl: "nl", gl: "NL", ceid: "NL:nl", query: 'startup investering miljoen ophaalt'}
     - {hl: "sv", gl: "SE", ceid: "SE:sv", query: 'startup finansieringsrunda miljoner'}
     - {hl: "es", gl: "ES", ceid: "ES:es", query: 'startup "ronda de financiación" millones'}
+    # US rounds, in brief from 2026-10-25. The English queries above are pinned to
+    # Britain, so US news needs the US edition. One query per entry, as above.
+    - {hl: "en-US", gl: "US", ceid: "US:en", query: '"raises" ("seed" OR "series a" OR "series b") startup'}
+    - {hl: "en-US", gl: "US", ceid: "US:en", query: '"raises" ("seed" OR "series a") startup "San Francisco" OR "New York"'}
+    - {hl: "en-US", gl: "US", ceid: "US:en", query: '"raises" ("seed" OR "series a") startup Boston OR Austin OR Seattle OR "Los Angeles" OR Miami OR Chicago'}
+    - {hl: "en-US", gl: "US", ceid: "US:en", query: '"raises" AI startup ("seed round" OR "Series A")'}
+    - {hl: "en-US", gl: "US", ceid: "US:en", query: '"led by" ("seed round" OR "Series A" OR "Series B") startup'}
+    - {hl: "en-US", gl: "US", ceid: "US:en", query: '"pre-seed" OR "seed funding" startup announces'}
 
 # GDELT adds non-English European coverage.
 gdelt:

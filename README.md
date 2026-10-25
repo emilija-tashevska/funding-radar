@@ -1,12 +1,11 @@
 # Funding Radar
 
-Daily list of newly funded UK and European companies, scored as prospects for a
+Daily list of newly funded UK, European and US companies, scored as prospects for a
 fractional product, pricing and growth practice.
 
-- **Scope:** UK and Europe, pre-seed to Series B, 2M+ as reported (USD, GBP or EUR),
-  rolling 120-day window.
-- **Output:** a password-protected static site, plus a Telegram digest at 08:00 with
-  the day's three best prospects.
+- **Scope:** UK, Europe and the US, pre-seed to Series B, any size, rolling 120-day
+  window.
+- **Output:** a public static site on GitHub Pages, rebuilt after every scan.
 - **Two tiers:** a round is *confirmed* once the company resolves to a real website
   and the amount and stage are specific; everything else is kept as *unconfirmed*
   behind a filter.

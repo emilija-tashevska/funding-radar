@@ -25,6 +25,18 @@ rss:
   # Blocked last time; rechecked here
   - {name: Finsmes, url: "https://www.finsmes.com/feed"}
 
+  # US outlets, for the US joining the brief on 2026-10-25. Guesses until the runner says.
+  - {name: AlleyWatch, url: "https://www.alleywatch.com/feed/"}
+  - {name: GeekWire, url: "https://www.geekwire.com/feed/"}
+  - {name: VentureBeat, url: "https://venturebeat.com/feed/"}
+  - {name: Pulse 2.0, url: "https://pulse2.com/feed/"}
+  - {name: TechStartups, url: "https://techstartups.com/feed/"}
+  - {name: The SaaS News, url: "https://www.thesaasnews.com/rss"}
+  - {name: Fortune Term Sheet, url: "https://fortune.com/section/term-sheet/feed/"}
+  - {name: VC News Daily, url: "https://vcnewsdaily.com/rss.php"}
+  - {name: PR Newswire venture capital, url: "https://www.prnewswire.com/rss/financial-services-latest-news/venture-capital-list.rss"}
+  - {name: MedCity News, url: "https://medcitynews.com/feed/"}
+
 pages:
   - {name: Antler portfolio, url: "https://www.antler.co/portfolio"}
   - {name: Antler news, url: "https://www.antler.co/news"}
