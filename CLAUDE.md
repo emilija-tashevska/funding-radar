@@ -156,7 +156,8 @@ approval, never automatic).
 - **US coverage before the US joined the brief** came only incidentally (TechCrunch,
   Crunchbase News, Google News pinned to Britain): 257 US rounds in 120 days, 194 of
   them Seed to Series B, about 5 a day over the last month. Six Google News queries
-  on the US edition were added for it on 2026-10-25.
+  on the US edition and six US feeds were added for it on 2026-10-25. Descriptions
+  catch up slowly: a probe scan needed 191 and wrote 33 (27 links gave no text).
 
 ## Sources: what was checked (2026-09-27)
 
@@ -177,9 +178,11 @@ Seven of fifteen earlier invented VC URLs 404'd, so nothing goes in unverified.
 - Anthropic web search reaches Finsmes, but see Known issues for its yield.
 - Not pursued, by the owner's choice: Companies House, Tavily, OpenAI search.
 - Still open: Dealroom and Tracxn, press-release wires, more non-English locales.
-- US candidates (2026-10-25), waiting on the runner: AlleyWatch, GeekWire, VentureBeat,
-  Pulse 2.0, TechStartups, The SaaS News, Fortune Term Sheet, VC News Daily, PR Newswire
-  (venture capital), MedCity News.
+- Added for the US (runner, 2026-10-25; funding-like items of those fetched): The SaaS
+  News 14/15, TechStartups 9/20, AlleyWatch 8/10, PR Newswire venture capital 7/20,
+  GeekWire 5/35, MedCity News 4/30. Left out: Pulse 2.0 (1/20), VentureBeat (429),
+  Fortune Term Sheet and VC News Daily (404). Tech Funding News answered that day
+  (10 items, 3 funding-like) after a 403 in September; not added on one reading.
 
 ## Working agreements
 

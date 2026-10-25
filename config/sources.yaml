@@ -86,6 +86,16 @@ rss:
   # each, current, with UK funding stories (Basecamp Research, OneClickComply).
   - {name: Business Cloud, url: "https://www.businesscloud.co.uk/feed/"}
   - {name: FinTech Global, url: "https://fintech.global/feed/"}
+  # US outlets, for the US joining the brief. Verified from the runner on 2026-10-25
+  # (funding-like items of those fetched): The SaaS News 14/15, TechStartups 9/20,
+  # AlleyWatch 8/10 (New York), PR Newswire 7/20, GeekWire 5/35 (Seattle), MedCity
+  # News 4/30 (health). Pulse 2.0 answered but carried 1 in 20; VentureBeat 429'd.
+  - {name: The SaaS News, url: "https://www.thesaasnews.com/rss"}
+  - {name: TechStartups, url: "https://techstartups.com/feed/"}
+  - {name: AlleyWatch, url: "https://www.alleywatch.com/feed/"}
+  - {name: PR Newswire venture capital, url: "https://www.prnewswire.com/rss/financial-services-latest-news/venture-capital-list.rss"}
+  - {name: GeekWire, url: "https://www.geekwire.com/feed/"}
+  - {name: MedCity News, url: "https://medcitynews.com/feed/"}
   # Funds with a real feed. Mostly essays, but investment announcements appear here too.
   - {name: Balderton (feed), url: "https://www.balderton.com/feed/"}
   - {name: Seedcamp (feed), url: "https://seedcamp.com/feed/"}

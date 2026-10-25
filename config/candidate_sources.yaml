@@ -25,7 +25,9 @@ rss:
   # Blocked last time; rechecked here
   - {name: Finsmes, url: "https://www.finsmes.com/feed"}
 
-  # US outlets, for the US joining the brief on 2026-10-25. Guesses until the runner says.
+  # US outlets, for the US joining the brief on 2026-10-25. Runner check that day:
+  # six went into sources.yaml; Pulse 2.0 answered with 1 funding item in 20;
+  # VentureBeat 429, Fortune Term Sheet and VC News Daily 404.
   - {name: AlleyWatch, url: "https://www.alleywatch.com/feed/"}
   - {name: GeekWire, url: "https://www.geekwire.com/feed/"}
   - {name: VentureBeat, url: "https://venturebeat.com/feed/"}
