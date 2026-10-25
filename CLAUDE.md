@@ -20,7 +20,8 @@ These were settled with the owner. Do not quietly change them.
 | --- | --- |
 | Stages | Seed to Series B |
 | Size floor | **None** (owner, 2026-09-27): every in-brief round is included whatever its size. Was 2M. `min_amount` in config still works if a floor is wanted back |
-| Regions | UK and Europe in brief; US and elsewhere stored and filterable, off by default |
+| Regions | **UK, Europe and the US** in brief (owner, 2026-10-25: the US was stored but out of brief until then). Elsewhere stored and filterable, off by default |
+| Rounds whose news names no stage | Judged on size: above 50M (`unstated_stage_max_amount`, $/£/€ one for one) they are later than a Series B and out of brief. Added with the US on 2026-10-25, when 33 US rounds of $50M+ with no stated stage (Ramp's $1.85B among them) would otherwise have joined the list; it also took 12 European ones out (Mistral, Nscale). 0 turns it off |
 | Window | 120-day rolling history on the page |
 | Out-of-brief rounds | **Stored and labelled with the reason, never dropped.** The page filters them; the pipeline keeps them |
 | Rumoured or in-progress raises | Excluded ("X seeks $500M") — money in the bank only |
@@ -45,7 +46,8 @@ Six stages, `src/funding_radar/`:
    Amounts written in millions are rescaled; a missing currency is read off the
    symbol; region falls back to the country or city.
 3. **qualify.py** — normalises the stage, applies the brief, returns a `Verdict`
-   with the reason it is out of brief. `approx_usd` is for the floor (1:1 on
+   with the reason it is out of brief. A round with no stated stage is judged on
+   its size against `unstated_stage_max_amount`. `approx_usd` is for the floor (1:1 on
    USD/GBP/EUR by choice); `comparable_usd` uses real rates and is only for
    comparing two outlets against each other.
 4. **pipeline.py** — stores the round with its evidence, then judges it. Flags are
@@ -91,7 +93,7 @@ python scripts/recall_check.py               # what the pipeline misses
 python scripts/data_audit.py                 # amount / link / description coverage
 python scripts/verify_sources.py             # candidate sources (run it on the runner)
 python scripts/search_probe.py               # web search vs Google News (spends ~$0.25)
-pytest -q                                    # 277 tests, offline; browser tests need Playwright
+pytest -q                                    # 308 tests, offline; browser tests need Playwright
 ```
 
 ## Operations
@@ -145,10 +147,17 @@ approval, never automatic).
   Antler and EF pages are undated link lists; Techstars has no feed. Their rounds
   come through the press: four Google News queries, and the "Funds I follow" chip.
 - **Region from a headline** can be wrong: a round with no location in the
-  headline tends to come out as "other" and so out of brief.
+  headline tends to come out as "other" and so out of brief, and the outlet can
+  mislead: Crux Analytics, a US company, came out as Europe because tech.eu ran it.
 - Extraction scores **62/63** on the labelled set. The one miss is a headline that
   names no company.
-- Stage is often unstated in headlines; those rounds qualify on size alone.
+- Stage is often unstated in headlines; those rounds qualify on size alone, up to
+  `unstated_stage_max_amount`.
+- **US coverage before the US joined the brief** came only incidentally (TechCrunch,
+  Crunchbase News, Google News pinned to Britain): 257 US rounds in 120 days, 194 of
+  them Seed to Series B, about 5 a day over the last month. Six Google News queries
+  on the US edition and six US feeds were added for it on 2026-10-25. Descriptions
+  catch up slowly: a probe scan needed 191 and wrote 33 (27 links gave no text).
 
 ## Sources: what was checked (2026-09-27)
 
@@ -169,6 +178,11 @@ Seven of fifteen earlier invented VC URLs 404'd, so nothing goes in unverified.
 - Anthropic web search reaches Finsmes, but see Known issues for its yield.
 - Not pursued, by the owner's choice: Companies House, Tavily, OpenAI search.
 - Still open: Dealroom and Tracxn, press-release wires, more non-English locales.
+- Added for the US (runner, 2026-10-25; funding-like items of those fetched): The SaaS
+  News 14/15, TechStartups 9/20, AlleyWatch 8/10, PR Newswire venture capital 7/20,
+  GeekWire 5/35, MedCity News 4/30. Left out: Pulse 2.0 (1/20), VentureBeat (429),
+  Fortune Term Sheet and VC News Daily (404). Tech Funding News answered that day
+  (10 items, 3 funding-like) after a 403 in September; not added on one reading.
 
 ## Working agreements
 

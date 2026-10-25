@@ -4,6 +4,10 @@ Three questions, in cheap-to-expensive order: is it in a region we cover, at a
 stage we cover, and large enough. The brief currently has no size floor
 (min_amount 0), so the third question always passes; the per-investor floor
 mechanism is kept so a floor can be restored from config alone.
+
+A round whose news names no stage is judged on its size: too big to be a Series B
+(unstated_stage_max_amount) and it is out, so a $1.85B raise does not sit in a
+seed-to-Series-B list just because the headline left the stage out.
 """
 
 from __future__ import annotations
@@ -81,6 +85,7 @@ class Rules:
     stages: tuple[str, ...]
     regions: tuple[str, ...]
     investor_floors: dict[str, float]  # normalised investor name -> its own floor
+    unstated_stage_max: float = 0.0    # 0: no ceiling for rounds that name no stage
 
     @classmethod
     def from_config(cls, config: dict) -> "Rules":
@@ -94,6 +99,7 @@ class Rules:
             stages=tuple(s.lower() for s in filters.get("stages", [])),
             regions=tuple(r.lower() for r in filters.get("regions", [])),
             investor_floors=floors,
+            unstated_stage_max=float(filters.get("unstated_stage_max_amount") or 0),
         )
 
     def floor_for(self, investors: list[str]) -> float:
@@ -120,6 +126,9 @@ def qualifies(round_: Round, rules: Rules) -> Verdict:
 
     floor = rules.floor_for(round_.investors)
     amount = approx_usd(round_.amount_value, round_.currency)
+    if not stage and amount and rules.unstated_stage_max and amount > rules.unstated_stage_max:
+        return Verdict(False, f"stage not stated and {amount:,.0f} is more than a Series B "
+                              f"raises (over {rules.unstated_stage_max:,.0f})")
     if not amount:
         # Undisclosed (a reported 0 counts as undisclosed, not as a zero-pound
         # round). Still worth seeing at the right stage; it stays unconfirmed
